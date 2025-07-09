@@ -20,8 +20,22 @@ __pycache__
 # 로그 파일
 *.log
 
-# 데이터베이스
-/*.db
-database
+# 데이터베이스 파일 (모든 위치)
 *.db
-database.db
+*.sqlite
+*.sqlite3
+database/
+**/database/
+**/database.db
+**/database.sqlite
+**/database.sqlite3
+
+# 데이터베이스 관련 디렉토리
+data_prepro/database/
+old/database/
+
+# 대용량 파일 (100MB 이상)
+*.zip
+*.tar.gz
+*.rar
+*.7z
