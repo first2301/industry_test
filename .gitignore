@@ -1,0 +1,26 @@
+# 가상 환경
+/.venv
+
+# 파이썬 관련
+/__pycache__/
+__pycache__
+
+# 배포 및 패키징
+/dist/
+/build/
+/*.egg-info/
+
+# 환경 변수
+/.env
+/.env.*
+
+# IDE 설정
+/.vscode/
+
+# 로그 파일
+*.log
+
+# 데이터베이스
+/*.db
+
+
