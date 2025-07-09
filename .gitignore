@@ -22,5 +22,6 @@ __pycache__
 
 # 데이터베이스
 /*.db
-
-
+database
+*.db
+database.db
