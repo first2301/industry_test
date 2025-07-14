@@ -84,3 +84,5 @@ htmlcov/
 # 문서 빌드
 /docs/_build/
 /site/
+
+data
