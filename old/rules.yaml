@@ -1,0 +1,42 @@
+numeric:
+  missing_ratio:
+    - {gt: 0.40, action: "drop", why: "missing_ratio_over_40"}
+    - {gt: 0.15, action: "advanced_impute", why: "missing_ratio_15_40"}
+    - {gt: 0.00, action: "simple_impute", why: "small_missing_values"}
+
+  skew_kurt:
+    - {skew: 3, kurt: 10, action: "yeo_johnson_transform", why: "extreme_skew_kurt"}
+    - {skew: 2, kurt: 7, action: "boxcox_transform", why: "high_skew_kurt"}
+    - {skew: 1.5, action: "log_transform", why: "moderate_high_skew"}
+    - {skew: 1, action: "sqrt_transform", why: "moderate_skew"}
+    - {kurt: 7, action: "winsorize", why: "high_kurtosis_only"}
+
+  variance:
+    - {cv_lt: 0.05, action: "drop_constant", why: "near_constant_values"}
+    - {cv_lt: 0.1, action: "feature_selection", why: "low_variance"}
+
+  outliers:
+    - {action: "isolation_forest", why: "multivariate_outlier_detection"}
+    - {action: "iqr_method", why: "univariate_outlier_detection"}
+    - {action: "z_score_method", why: "normal_distribution_outliers"}
+
+  scaling:
+    - {cv_gt: 1.0, action: "robust_scaler", why: "high_variance_outliers"}
+    - {cv_gt: 0.5, action: "standard_scaler", why: "moderate_variance"}
+    - {action: "min_max_scaler", why: "bounded_scaling"}
+
+categorical:
+  missing_ratio:
+    - {gt: 0.30, action: "drop_column", why: "missing_ratio_over_30"}
+    - {gt: 0.10, action: "impute_mode", why: "missing_ratio_10_30"}
+    - {gt: 0.05, action: "impute_frequent", why: "missing_ratio_5_10"}
+
+  cardinality:
+    - {lte: 2, action: "binary_encode", why: "binary_variable"}
+    - {lte: 10, action: "one_hot_encode", why: "low_cardinality"}
+    - {lte: 50, action: "ordinal_encode", why: "medium_cardinality"}
+    - {lte: 1000, action: "target_encode", why: "high_cardinality"}
+    - {gt: 1000, action: "feature_hashing", why: "very_high_cardinality"}
+
+datetime:
+  extract: ["year", "month", "day", "hour", "weekday"] 

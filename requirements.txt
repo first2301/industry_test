@@ -1,0 +1,15 @@
+streamlit
+pandas
+numpy
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+scikit-learn
+xgboost
+catboost
+lightgbm
+matplotlib
+plotly
+seaborn
+tqdm

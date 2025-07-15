@@ -1,0 +1,65 @@
+numeric:
+  missing_ratio:
+    - {gt: 0.40, action: "drop_column", why: "missing_ratio_over_40"}
+    - {gt: 0.15, action: "advanced_impute", why: "missing_ratio_15_40"}
+    - {gt: 0.00, action: "simple_impute", why: "small_missing_values"}
+
+  # 개선된 왜도/첨도 규칙 - 더 세분화
+  skew_kurt:
+    # 극도로 비대칭한 경우 (왜도 > 3 또는 첨도 > 15)
+    - {skew: 3, kurt: 15, action: "yeo_johnson_transform", why: "extreme_skew_kurt"}
+    # 높은 왜도 + 첨도 (왜도 > 2, 첨도 > 7)
+    - {skew: 2, kurt: 7, action: "boxcox_transform", why: "high_skew_kurt"}
+    # 중간 왜도 (왜도 > 1.5)
+    - {skew: 1.5, action: "log_transform", why: "moderate_high_skew"}
+    # 약한 왜도 (왜도 > 1)
+    - {skew: 1, action: "sqrt_transform", why: "moderate_skew"}
+    # 높은 첨도만 있는 경우
+    - {kurt: 7, action: "winsorize", why: "high_kurtosis_only"}
+
+  # 분산 기반 규칙
+  variance:
+    - {cv_lt: 0.05, action: "drop_constant", why: "near_constant_values"}
+    - {cv_lt: 0.1, action: "feature_selection", why: "low_variance"}
+
+  # 이상치 탐지 규칙
+  outliers:
+    - {action: "isolation_forest", why: "multivariate_outlier_detection"}
+    - {action: "iqr_method", why: "univariate_outlier_detection"}
+    - {action: "z_score_method", why: "normal_distribution_outliers"}
+
+  # 스케일링 규칙 - 분산과 이상치 수준에 따라
+  scaling:
+    - {cv_gt: 1.0, action: "robust_scaler", why: "high_variance_outliers"}
+    - {cv_gt: 0.5, action: "standard_scaler", why: "moderate_variance"}
+    - {action: "min_max_scaler", why: "bounded_scaling"}
+
+  # 데이터 타입별 특별 규칙
+  data_type_specific:
+    # 온도 데이터 (음수 왜도가 많은 경우)
+    - {name_contains: "temp", skew_lt: -2, action: "log_transform_shifted", why: "temperature_data_negative_skew"}
+    # 상태 데이터 (이산형)
+    - {name_contains: "state", unique_lt: 10, action: "ordinal_encode", why: "discrete_state_data"}
+    # ID 컬럼
+    - {name_contains: "id", unique_ratio_gt: 0.9, action: "drop_column", why: "id_column"}
+
+categorical:
+  missing_ratio:
+    - {gt: 0.30, action: "drop_column", why: "missing_ratio_over_30"}
+    - {gt: 0.10, action: "impute_mode", why: "missing_ratio_10_30"}
+    - {gt: 0.05, action: "impute_frequent", why: "missing_ratio_5_10"}
+
+  cardinality:
+    - {lte: 2, action: "binary_encode", why: "binary_variable"}
+    - {lte: 10, action: "one_hot_encode", why: "low_cardinality"}
+    - {lte: 50, action: "ordinal_encode", why: "medium_cardinality"}
+    - {lte: 1000, action: "target_encode", why: "high_cardinality"}
+    - {gt: 1000, action: "feature_hashing", why: "very_high_cardinality"}
+
+  # 텍스트 데이터 특별 규칙
+  text_specific:
+    - {name_contains: "date", action: "datetime_extraction", why: "date_time_data"}
+    - {name_contains: "desc", action: "text_preprocessing", why: "text_description"}
+
+datetime:
+  extract: ["year", "month", "day", "hour", "weekday", "quarter"] 

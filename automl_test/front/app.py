@@ -24,7 +24,8 @@ from io import StringIO
 import time
 import numpy as np
 import plotly.express as px
-
+from lib.research_prepro_engine import ResearchBasedRecommendationEngine
+from lib.visualization_engine import VisualizationRecommendationEngine
 
 # import matplotlib.pyplot as plt
 # import seaborn as sns
@@ -407,120 +408,90 @@ with st.spinner('Wait for it...'):
                                         'missing_ratio': data[col].isnull().sum() / len(data)
                                     }
                             
-                            # 지능형 전처리 추천
+                            # 전처리 추천 (ResearchBasedRecommendationEngine 기반)
                             preprocessing_recommendations = []
-                            
-                            for col in numeric_cols:
-                                if col in data_characteristics:
-                                    char = data_characteristics[col]
-                                    recommendations = []
-                                    
-                                    # 결측치 처리
-                                    if char['missing_ratio'] > 0.1:
-                                        recommendations.append('Missing Value Imputation (Mean/Median)')
-                                    
-                                    # 이상치 탐지
-                                    if abs(char['skewness']) > 1:
-                                        recommendations.append('Outlier Detection')
-                                    
-                                    # 스케일링 추천
-                                    if char['std'] > char['mean'] * 0.5:
-                                        recommendations.append('Standardization (Z-score)')
-                                    else:
-                                        recommendations.append('Normalization (Min-Max)')
-                                    
-                                    # 분포 특성에 따른 추천
-                                    if abs(char['skewness']) > 2:
-                                        recommendations.append('Log/Box-Cox Transformation')
-                                    
-                                    # 기본 추천
-                                    if len(recommendations) < 3:
-                                        recommendations.extend(['Feature Engineering', 'Robust Scaling'])
-                                    
-                                    preprocessing_recommendations.append({
-                                        'Column': col,
-                                        'Data Type': 'Numeric',
-                                        'Primary Recommendation': recommendations[0] if recommendations else 'Standardization',
-                                        'Secondary Recommendation': recommendations[1] if len(recommendations) > 1 else 'Normalization',
-                                        'Additional Techniques': ', '.join(recommendations[2:]) if len(recommendations) > 2 else 'None'
-                                    })
-                            
-                            for col in categorical_cols:
-                                unique_count = data[col].nunique()
-                                missing_ratio = data[col].isnull().sum() / len(data)
-                                
-                                recommendations = []
-                                if missing_ratio > 0.1:
-                                    recommendations.append('Missing Value Imputation')
-                                
-                                if unique_count < 10:
-                                    recommendations.append('One-Hot Encoding')
-                                elif unique_count < 50:
-                                    recommendations.append('Label Encoding')
-                                else:
-                                    recommendations.append('Target Encoding')
-                                
-                                if unique_count > 100:
-                                    recommendations.append('Feature Selection')
-                                
+                            engine = ResearchBasedRecommendationEngine()
+                            rec_result = engine.run(data)
+
+                            for col in data.columns:
+                                recs = rec_result['preprocessing'].get(col, [])
+                                if not recs:
+                                    continue
+                                # 추천을 테이블 형태에 맞게 분리
+                                primary = recs[0]['action'] if len(recs) > 0 else '-'
+                                secondary = recs[1]['action'] if len(recs) > 1 else '-'
+                                additional = ', '.join([r['action'] for r in recs[2:]]) if len(recs) > 2 else 'None'
                                 preprocessing_recommendations.append({
                                     'Column': col,
-                                    'Data Type': 'Categorical',
-                                    # 'Unique Values': unique_count,
-                                    # 'Missing Ratio': f"{missing_ratio:.2%}",
-                                    'Primary Recommendation': recommendations[0] if recommendations else 'One-Hot Encoding',
-                                    'Secondary Recommendation': recommendations[1] if len(recommendations) > 1 else 'Label Encoding',
-                                    'Additional Techniques': ', '.join(recommendations[2:]) if len(recommendations) > 2 else 'None'
+                                    'Primary Recommendation': primary,
+                                    'Secondary Recommendation': secondary,
+                                    'Additional Techniques': additional
                                 })
                             
-                            # 시각화 추천
+                            # 시각화 추천 (개선된 엔진 사용)
                             visualization_recommendations = []
+                            vis_engine = VisualizationRecommendationEngine()
+                            vis_result = vis_engine.run(data)
                             
+                            # 수치형 컬럼 시각화 추천
                             for col in numeric_cols:
-                                if col in data_characteristics:
-                                    char = data_characteristics[col]
-                                    vis_recommendations = []
+                                if col in vis_result['visualization']:
+                                    recs = vis_result['visualization'][col]
+                                    if not recs:
+                                        continue
                                     
-                                    # 분포 특성에 따른 시각화
-                                    if abs(char['skewness']) > 1:
-                                        vis_recommendations.extend(['Box Plot', 'Histogram with KDE'])
-                                    else:
-                                        vis_recommendations.extend(['Histogram', 'Density Plot'])
-                                    
-                                    # 이상치 탐지
-                                    if abs(char['skewness']) > 2:
-                                        vis_recommendations.append('Outlier Plot')
-                                    
-                                    # 기본 추천
-                                    vis_recommendations.extend(['Distribution Plot', 'Summary Statistics'])
+                                    # 추천을 테이블 형태에 맞게 분리
+                                    primary = recs[0]['chart'] if len(recs) > 0 else '-'
+                                    secondary = recs[1]['chart'] if len(recs) > 1 else '-'
+                                    additional = ', '.join([r['chart'] for r in recs[2:]]) if len(recs) > 2 else 'None'
                                     
                                     visualization_recommendations.append({
                                         'Column': col,
-                                        'Data Type': 'Numeric',
-                                        'Primary Visualization': vis_recommendations[0],
-                                        'Secondary Visualization': vis_recommendations[1] if len(vis_recommendations) > 1 else 'Histogram',
-                                        'Additional Charts': ', '.join(vis_recommendations[2:]) if len(vis_recommendations) > 2 else 'None'
+                                        'Primary Visualization': primary,
+                                        'Secondary Visualization': secondary,
+                                        'Additional Charts': additional
                                     })
                             
+                            # 범주형 컬럼 시각화 추천
                             for col in categorical_cols:
-                                unique_count = data[col].nunique()
-                                vis_recommendations = []
-                                
-                                if unique_count <= 10:
-                                    vis_recommendations.extend(['Bar Chart', 'Pie Chart'])
-                                else:
-                                    vis_recommendations.extend(['Bar Chart', 'Horizontal Bar Chart'])
-                                
-                                vis_recommendations.extend(['Value Counts', 'Category Distribution'])
-                                
-                                visualization_recommendations.append({
-                                    'Column': col,
-                                    'Data Type': 'Categorical',
-                                    'Unique Values': unique_count,
-                                    'Primary Visualization': vis_recommendations[0],
-                                    'Secondary Visualization': vis_recommendations[1] if len(vis_recommendations) > 1 else 'Bar Chart',
-                                    'Additional Charts': ', '.join(vis_recommendations[2:]) if len(vis_recommendations) > 2 else 'None'
-                                })
+                                if col in vis_result['visualization']:
+                                    recs = vis_result['visualization'][col]
+                                    if not recs:
+                                        continue
+                                    
+                                    # 추천을 테이블 형태에 맞게 분리
+                                    primary = recs[0]['chart'] if len(recs) > 0 else '-'
+                                    secondary = recs[1]['chart'] if len(recs) > 1 else '-'
+                                    additional = ', '.join([r['chart'] for r in recs[2:]]) if len(recs) > 2 else 'None'
+                                    
+                                    visualization_recommendations.append({
+                                        'Column': col,
+                                        'Primary Visualization': primary,
+                                        'Secondary Visualization': secondary,
+                                        'Additional Charts': additional
+                                    })
+                            
+                            # 상관관계 시각화 추천
+                            if '_correlation' in vis_result['visualization']:
+                                corr_recs = vis_result['visualization']['_correlation']
+                                if corr_recs:
+                                    visualization_recommendations.append({
+                                        'Column': 'All Numeric Columns',
+                                        'Primary Visualization': corr_recs[0]['chart'],
+                                        'Secondary Visualization': corr_recs[1]['chart'] if len(corr_recs) > 1 else 'Correlation Heatmap',
+                                        'Additional Charts': ', '.join([r['chart'] for r in corr_recs[2:]]) if len(corr_recs) > 2 else 'None'
+                                    })
+                            
+                            # 전체 분포 시각화 추천
+                            if '_distribution' in vis_result['visualization']:
+                                dist_recs = vis_result['visualization']['_distribution']
+                                if dist_recs:
+                                    visualization_recommendations.append({
+                                        'Column': 'Dataset Overview',
+                                        'Primary Visualization': dist_recs[0]['chart'],
+                                        'Secondary Visualization': dist_recs[1]['chart'] if len(dist_recs) > 1 else 'Summary Statistics',
+                                        'Additional Charts': ', '.join([r['chart'] for r in dist_recs[2:]]) if len(dist_recs) > 2 else 'None'
+                                    })
                             
                             # 모델 성능 기반 추천
                             best_model = sorted_df.iloc[0] if len(sorted_df) > 0 else None
@@ -536,19 +507,75 @@ with st.spinner('Wait for it...'):
                             st.subheader("📈 시각화 추천 결과")
                             st.dataframe(vis_recommendations_df, use_container_width=True)
                             
+                            # 시각화 추천 상세 설명
+                            st.subheader("📊 시각화 추천 상세 설명")
+                            # st.info("""
+                            # **시각화 유형별 설명:**
+                            
+                            # **수치형 데이터:**
+                            # - **Histogram**: 기본 분포 분석
+                            # - **Box Plot**: 이상치 및 분위수 분석
+                            # - **Density Plot**: 확률 밀도 함수
+                            # - **Q-Q Plot**: 정규분포 검증
+                            # - **Violin Plot**: 분포 형태와 밀도 동시 분석
+                            
+                            # **범주형 데이터:**
+                            # - **Bar Chart**: 기본 빈도 분석
+                            # - **Pie Chart**: 비율 분석 (낮은 카디널리티)
+                            # - **Horizontal Bar Chart**: 긴 카테고리명 처리
+                            # - **Word Cloud**: 텍스트 데이터 분석
+                            
+                            # **상관관계 분석:**
+                            # - **Correlation Heatmap**: 변수 간 상관관계
+                            # - **Pair Plot**: 다변량 관계 분석
+                            
+                            # **시계열 데이터:**
+                            # - **Time Series Plot**: 시간에 따른 변화
+                            # - **Seasonal Decomposition**: 계절성 분석
+                            # """)
+                            
                             # 통합 추천 결과
                             if best_model is not None:
-                                st.subheader("🎯 최적 모델 추천 결과")
+                                st.subheader("🎯 통합 추천 결과")
                                 best_model_name = sorted_df.index[0] # if len(sorted_df) > 0 else "Unknown"
+                                
+                                # 최적 전처리 방법 찾기
+                                best_preprocessing = 'N/A'
+                                if len(prepro_recommendations_df) > 0:
+                                    # 가장 중요한 전처리 방법 선택 (첫 번째 추천)
+                                    best_preprocessing = prepro_recommendations_df.iloc[0]['Primary Recommendation']
+                                
+                                # 최적 시각화 방법 찾기
+                                best_visualization = 'N/A'
+                                if len(vis_recommendations_df) > 0:
+                                    # 첫 번째 시각화 방법 선택
+                                    best_visualization = vis_recommendations_df.iloc[0]['Primary Visualization']
                                 
                                 recommendation_summary = {
                                     'Best Model': best_model_name,
-                                    'Key Preprocessing': prepro_recommendations_df.iloc[0]['Primary Recommendation'] if len(prepro_recommendations_df) > 0 else 'N/A',
-                                    'Key Visualization': vis_recommendations_df.iloc[0]['Primary Visualization'] if len(vis_recommendations_df) > 0 else 'N/A'
+                                    'Key Preprocessing': best_preprocessing,
+                                    'Key Visualization': best_visualization,
                                 }
                                 
                                 summary_df = pd.DataFrame([recommendation_summary])
                                 st.dataframe(summary_df, use_container_width=True)
+                                
+                                # 추천 근거 설명
+                                # st.subheader("📋 추천 근거")
+                                # st.info(f"""
+                                # **모델 선택 근거:**
+                                # - 선택된 모델 '{best_model_name}'은 모든 평가지표에서 최고 성능을 보였습니다.
+                                
+                                # **전처리 추천 근거:**
+                                # - 데이터 특성 분석을 통해 가장 적합한 전처리 방법을 추천했습니다.
+                                
+                                # **시각화 추천 근거:**
+                                # - 데이터 타입과 분포 특성을 고려하여 최적의 시각화 방법을 제안했습니다.
+                                
+                                # **데이터 특성:**
+                                # - 총 {len(data)}개의 샘플과 {len(data.columns)}개의 특성으로 구성된 데이터셋입니다.
+                                # - 수치형 특성: {len(numeric_cols)}개, 범주형 특성: {len(categorical_cols)}개
+                                # """)
                         else:
                             error_data = response.json()
                             st.error(f"API 오류: {error_data.get('error', '알 수 없는 오류')}")
