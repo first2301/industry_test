@@ -180,40 +180,6 @@ class DataUtils:
             params['imb_method'] = imb_method
         
         return params, selected_methods
-
-    
-    @staticmethod
-    def display_correlation_analysis(df: pd.DataFrame, df_aug: pd.DataFrame, x_col: str, y_col: str):
-        """상관관계 분석 결과를 표시합니다."""
-        # 상관관계 비교
-        orig_corr = df[x_col].corr(df[y_col])
-        aug_corr = df_aug[x_col].corr(df_aug[y_col])
-        
-        corr_col1, corr_col2, corr_col3 = st.columns(3)
-        
-        with corr_col1:
-            st.metric("원본 상관계수", f"{orig_corr:.3f}")
-        
-        with corr_col2:
-            st.metric("증강 상관계수", f"{aug_corr:.3f}")
-        
-        with corr_col3:
-            corr_change = aug_corr - orig_corr
-            st.metric("상관계수 변화", f"{corr_change:.3f}", delta=f"{corr_change:.3f}")
-        
-        # 데이터 포인트 수 비교
-        point_col1, point_col2, point_col3 = st.columns(3)
-        
-        with point_col1:
-            st.metric("원본 데이터 포인트", f"{len(df):,}개")
-        
-        with point_col2:
-            st.metric("증강 데이터 포인트", f"{len(df_aug):,}개")
-        
-        with point_col3:
-            point_change = len(df_aug) - len(df)
-            point_change_pct = (point_change / len(df)) * 100
-            st.metric("포인트 증가", f"{point_change:,}개", delta=f"{point_change_pct:.1f}%")
     
     @staticmethod
     def filter_categorical_columns(categorical_cols: List[str], df: pd.DataFrame) -> List[str]:

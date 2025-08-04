@@ -13,7 +13,7 @@ from lib import DataAugmenter, DataVisualizer, DataUtils
 
 # 페이지 설정
 st.set_page_config(layout='wide')
-st.title("🧾 CSV 정형 데이터 증강 및 시각화 도구")
+st.title("1. CSV 정형 데이터 증강 및 시각화 도구")
 
 # 클래스 인스턴스 생성
 augmenter = DataAugmenter()
@@ -24,10 +24,10 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
     """사이드바에서 증강 파라미터를 설정하고 반환합니다."""
     with st.sidebar:
         st.markdown("---")
-        st.markdown("**🔧 증강 파라미터 설정**")
+        st.markdown("**1. 증강 파라미터 설정**")
         
         # SMOTE 관련 설정
-        st.markdown("**🎯 SMOTE 설정**")
+        st.markdown("**2. SMOTE 설정**")
         use_smote = st.checkbox("SMOTE 사용", value=False, help="불균형 데이터 증강을 위해 SMOTE를 사용합니다.")
         
         target_col = None
@@ -50,10 +50,10 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
             imb_method = st.selectbox("불균형 증강 방법", ["SMOTE", "RandomOverSampler", "RandomUnderSampler"], key="imb_method_select")
         
         # 노이즈 설정
-        st.markdown("**🔊 노이즈 설정**")
+        st.markdown("**3. 노이즈 설정**")
         
         # 노이즈 레벨 통합 설명
-        with st.expander("ℹ️ 노이즈 레벨 설명"):
+        with st.expander("노이즈 레벨 설명"):
             st.markdown("""
             **권장 설정:**
             - **낮은 노이즈 (0.01~0.05)**: 데이터의 원래 특성을 최대한 유지
@@ -69,7 +69,7 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
         )
         
         # 증강 비율 설정
-        st.markdown("**📊 증강 비율 설정**")
+        st.markdown("**4. 증강 비율 설정**")
         
         # 통합된 증강 비율
         augmentation_ratio = st.slider(
@@ -86,16 +86,10 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
             help="전체 데이터를 몇 번 복제할지 설정"
         )
         
-        # 특성 기반 증강 설정 (간단하게)
-        feature_ratio = st.slider(
-            "특성 증강 비율", 
-            0.1, 1.0, 0.3, 
-            step=0.1, 
-            help="각 특성별로 증강할 데이터의 비율"
-        )
+
         
         # 데이터 삭제 설정
-        st.markdown("**🗑️ 데이터 삭제 설정**")
+        st.markdown("**5. 데이터 삭제 설정**")
         use_drop = st.checkbox("데이터 삭제 사용", value=False, help="과적합 방지를 위해 일부 데이터를 삭제합니다.")
         drop_rate = None
         if use_drop:
@@ -113,7 +107,6 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
     params = {
         'noise_level': noise_level,
         'dup_count': dup_count,
-        'feature_ratio': feature_ratio,
         'augmentation_ratio': augmentation_ratio
     }
     
@@ -134,10 +127,6 @@ if uploaded_file is not None:
     
     if df is not None and DataUtils.validate_data(df):
         
-        # 원본 데이터 미리보기
-        DataUtils.show_data_preview(df, "원본 데이터 미리보기")
-        st.markdown("---")
-
         # ===== 컬럼 타입 분석 =====
         numeric_cols = visualizer.get_numeric_columns(df)
         categorical_cols = visualizer.get_categorical_columns(df)
@@ -149,76 +138,121 @@ if uploaded_file is not None:
         # ===== 데이터 증강 실행 =====
         df_aug = augmenter._combined_augmentation(df, methods=selected_methods, **params)
         
-        # ===== 클래스 분포 비교 (SMOTE 사용 시) =====
-        if 'smote' in selected_methods and 'target_col' in params and params['target_col'] in categorical_cols:
-            st.markdown("**📊 클래스 분포 비교**")
-            visualizer.compare_distributions(df, df_aug, params['target_col'])
-
-        # ===== 증강 데이터 미리보기 =====
-        DataUtils.show_data_preview(df_aug, "증강 데이터 미리보기")
-
         # ===== 증강 전후 비교 섹션 =====
         st.markdown("---")
-        st.subheader("📊 증강 전후 비교")
+        st.subheader("1. 증강 전후 비교")
         
-        
+        # ===== 클래스 분포 비교 (SMOTE 사용 시) =====
+        if 'smote' in selected_methods and 'target_col' in params and params['target_col'] in categorical_cols:
+            st.markdown("### 1-1. 클래스 분포 비교")
+            visualizer.compare_distributions(df, df_aug, params['target_col'])
+
         # ===== 수치형 데이터 시각화 =====
         if numeric_cols:
-            st.markdown("**📊 증강 전후 분포 비교**")
             selected_compare = st.selectbox("비교할 수치형 컬럼 선택", numeric_cols, key="compare_select")
             
-            # 겹쳐진 분포 비교 시각화
-            st.markdown("**겹쳐진 분포 비교**")
-            
-            # 히스토그램과 박스플롯 비교
+            # 히스토그램 비교
+            st.markdown("### 1-2. 히스토그램 분포 비교")
             fig_overlap_hist = visualizer.create_overlapping_histogram(df, df_aug, selected_compare)
             st.plotly_chart(fig_overlap_hist, use_container_width=True, key="overlap_hist")
             
+            # 박스플롯 비교
+            st.markdown("### 1-3. 박스플롯 분포 비교")
             fig_overlap_box = visualizer.create_overlapping_boxplot(df, df_aug, selected_compare)
             st.plotly_chart(fig_overlap_box, use_container_width=True, key="overlap_box")
             
-            # 상세 비교 요약
+            # 통계 요약 (히스토그램과 박스플롯 모두에 대한 요약)
+            st.markdown("### 1-4. 통계 요약 (히스토그램 & 박스플롯)")
             visualizer.display_comparison_summary(df, df_aug, numeric_cols)
             
             # ===== 산점도 비교 (수치형 컬럼이 2개 이상인 경우) =====
             if len(numeric_cols) >= 2:
-                st.markdown("**📊 증강 전후 산점도 비교**")
-                
-                # 겹쳐진 산점도 시각화
-                st.markdown("**겹쳐진 산점도 비교**")
-                
+                st.markdown("### 1-5. 산점도 비교")
                 x_col_overlap = st.selectbox("X축 컬럼", numeric_cols, key="scatter_x_overlap")
                 y_col_overlap = st.selectbox("Y축 컬럼", [col for col in numeric_cols if col != x_col_overlap], key="scatter_y_overlap")
                 
                 if x_col_overlap and y_col_overlap:
                     fig_overlap_scatter = visualizer.create_overlapping_scatter(df, df_aug, x_col_overlap, y_col_overlap)
                     st.plotly_chart(fig_overlap_scatter, use_container_width=True, key="overlap_scatter")
-                
-                # 상관관계 분석 (추상화된 메서드 사용)
-                if x_col_overlap and y_col_overlap:
-                    st.markdown("**📋 산점도 비교 분석**")
-                    DataUtils.display_correlation_analysis(df, df_aug, x_col_overlap, y_col_overlap)
+                    
+                    # 산점도 통계 요약 (임시로 직접 정의)
+                    st.markdown("### 1-6. 산점도 통계 요약")
+                    
+                    # 상관계수 계산
+                    orig_corr = df[x_col_overlap].corr(df[y_col_overlap])
+                    aug_corr = df_aug[x_col_overlap].corr(df_aug[y_col_overlap])
+                    corr_change = aug_corr - orig_corr
+                    
+                    # 데이터 포인트 수
+                    orig_points = len(df)
+                    aug_points = len(df_aug)
+                    points_increase = aug_points - orig_points
+                    points_increase_pct = (points_increase / orig_points) * 100
+                    
+                    # 통계 요약표 생성
+                    summary_data = {
+                        '지표': ['상관계수', '데이터 포인트'],
+                        '원본': [f"{orig_corr:.3f}", f"{orig_points:,}개"],
+                        '증강': [f"{aug_corr:.3f}", f"{aug_points:,}개"],
+                        '변화량': [f"{corr_change:.3f}", f"{points_increase:,}개"],
+                        '변화율': [f"{corr_change/orig_corr*100:.1f}%" if orig_corr != 0 else "N/A", f"{points_increase_pct:.1f}%"]
+                    }
+                    
+                    summary_df = pd.DataFrame(summary_data)
+                    st.dataframe(summary_df, use_container_width=True)
+                    
         
         # ===== 범주형 데이터 비교 =====
         filtered_categorical_cols = DataUtils.filter_categorical_columns(categorical_cols, df)
 
         if filtered_categorical_cols:
-            st.markdown("**📊 범주형 데이터 비교**")
+            st.markdown("### 2. 범주형 데이터 비교")
             selected_cat_compare = st.selectbox("비교할 범주형 컬럼 선택", filtered_categorical_cols, key="cat_compare_select")
             
-            col1, col2 = st.columns(2)
+            # 원본 데이터 카운트
+            orig_counts = df[selected_cat_compare].value_counts().sort_index()
+            aug_counts = df_aug[selected_cat_compare].value_counts().sort_index()
             
-            with col1:
-                st.markdown("**원본 데이터 분포**")
-                fig_orig_bar = visualizer.create_categorical_visualization(df, selected_cat_compare, "막대그래프")
-                if fig_orig_bar:
-                    st.plotly_chart(fig_orig_bar, use_container_width=True, key="orig_bar")
+            # 모든 카테고리 통합
+            all_categories = sorted(set(orig_counts.index) | set(aug_counts.index))
             
-            with col2:
-                st.markdown("**증강 데이터 분포**")
-                fig_aug_bar = visualizer.create_categorical_visualization(df_aug, selected_cat_compare, "막대그래프")
-                if fig_aug_bar:
-                    st.plotly_chart(fig_aug_bar, use_container_width=True, key="aug_bar")
+            # 데이터프레임 생성
+            comparison_data = []
+            for cat in all_categories:
+                orig_count = orig_counts.get(cat, 0)
+                aug_count = aug_counts.get(cat, 0)
+                comparison_data.append({
+                    '카테고리': cat,
+                    '원본': orig_count,
+                    '증강': aug_count,
+                    '증가량': aug_count - orig_count,
+                    '증가율(%)': ((aug_count - orig_count) / orig_count * 100) if orig_count > 0 else float('inf')
+                })
+            
+            comparison_df = pd.DataFrame(comparison_data)
+            
+            # 겹쳐서 보여주는 막대그래프 생성
+            fig_overlap = px.bar(
+                comparison_df,
+                x='카테고리',
+                y=['원본', '증강'],
+                title=f'{selected_cat_compare} 분포 비교 (원본 vs 증강)',
+                barmode='group',
+                color_discrete_map={'원본': '#1f77b4', '증강': '#ff7f0e'}
+            )
+            
+            fig_overlap.update_layout(
+                xaxis_title="카테고리",
+                yaxis_title="개수",
+                legend_title="데이터",
+                height=500
+            )
+            
+            st.plotly_chart(fig_overlap, use_container_width=True, key="overlap_cat")
+            
+            # 통계 요약표
+            st.markdown("**통계 요약**")
+            st.dataframe(comparison_df, use_container_width=True)
         
 
         # ===== 증강 결과 리포트 =====
@@ -233,7 +267,7 @@ if uploaded_file is not None:
         
 else:
     # ===== 초기 안내 메시지 =====
-    with st.expander("📋 지원되는 데이터 형식"):
+    with st.expander("지원되는 데이터 형식"):
         st.markdown("""
         - **수치형 데이터**: 히스토그램, 박스플롯에 적합
         - **범주형 데이터**: 막대그래프, 파이차트에 적합

@@ -197,7 +197,7 @@ class DataAugmenter:
         
         return result_df
     
-    def _feature_based_augmentation(self, df, feature_ratio=0.3, **kwargs):
+    def _feature_based_augmentation(self, df, **kwargs):
         """특성 기반 데이터 증강을 수행합니다."""
         # 수치형 컬럼 분석
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -219,8 +219,8 @@ class DataAugmenter:
             q75 = df[col].quantile(0.75)
             iqr = q75 - q25
             
-            # 증강할 데이터 개수 (각 특성별로)
-            augment_count = int(len(df) * feature_ratio)
+            # 증강할 데이터 개수 (기본값: 원본 데이터의 30%)
+            augment_count = int(len(df) * 0.3)
             
             # 다양한 증강 방법 적용
             for i in range(augment_count):
@@ -228,16 +228,16 @@ class DataAugmenter:
                 random_idx = np.random.choice(df.index)
                 new_row = df.loc[random_idx].copy()
                 
-                # 특성별 증강 전략
-                if i % 3 == 0:  # 평균 중심 증강
-                    new_row[col] = mean_val + np.random.normal(0, std_val * 0.1)
-                elif i % 3 == 1:  # 사분위수 기반 증강
-                    new_row[col] = q25 + np.random.uniform(0, iqr)
-                else:  # 경계값 기반 증강
+                # 특성별 증강 전략 (더 넓은 범위로 증강)
+                if i % 3 == 0:  # 평균 중심 증강 (표준편차 증가)
+                    new_row[col] = mean_val + np.random.normal(0, std_val * 0.5)
+                elif i % 3 == 1:  # 사분위수 기반 증강 (전체 범위 사용)
+                    new_row[col] = df[col].min() + np.random.uniform(0, df[col].max() - df[col].min())
+                else:  # 경계값 기반 증강 (더 넓은 범위)
                     if np.random.random() > 0.5:
-                        new_row[col] = df[col].min() + np.random.uniform(0, std_val * 0.5)
+                        new_row[col] = df[col].min() + np.random.uniform(0, std_val * 2.0)
                     else:
-                        new_row[col] = df[col].max() - np.random.uniform(0, std_val * 0.5)
+                        new_row[col] = df[col].max() - np.random.uniform(0, std_val * 2.0)
                 
                 augmentation_data.append(new_row)
         
@@ -308,7 +308,8 @@ class DataAugmenter:
         elif method == 'drop':
             method_kwargs['drop_rate'] = all_kwargs.get('drop_rate', 0.1)
         elif method == 'feature':
-            method_kwargs['feature_ratio'] = all_kwargs.get('feature_ratio', 0.3)
+            # feature_ratio 파라미터 제거 - 기본값 0.3 사용
+            pass
         elif method == 'smote':
             method_kwargs['target_col'] = all_kwargs.get('target_col')
             method_kwargs['imb_method'] = all_kwargs.get('imb_method', 'SMOTE')

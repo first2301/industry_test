@@ -30,20 +30,20 @@ class DataVisualizer:
         """겹쳐진 히스토그램을 생성합니다."""
         fig = go.Figure()
         
-        # 원본 데이터 히스토그램
-        fig.add_trace(go.Histogram(
-            x=df_orig[column],
-            name='원본 데이터',
-            opacity=0.7,
-            marker_color='lightblue'  # 연한 파랑
-        ))
-        
-        # 증강 데이터 히스토그램
+        # 증강 데이터 히스토그램 (뒤에 배치)
         fig.add_trace(go.Histogram(
             x=df_aug[column],
             name='증강 데이터',
             opacity=0.7,
             marker_color='lightcoral'  # 연한 빨강
+        ))
+        
+        # 원본 데이터 히스토그램 (앞에 배치)
+        fig.add_trace(go.Histogram(
+            x=df_orig[column],
+            name='원본 데이터',
+            opacity=0.7,
+            marker_color='lightblue'  # 연한 파랑
         ))
         
         fig.update_layout(
@@ -59,18 +59,18 @@ class DataVisualizer:
         """겹쳐진 박스플롯을 생성합니다."""
         fig = go.Figure()
         
-        # 원본 데이터 박스플롯
-        fig.add_trace(go.Box(
-            y=df_orig[column],
-            name='원본 데이터',
-            marker_color='lightblue'  # 연한 파랑
-        ))
-        
-        # 증강 데이터 박스플롯
+        # 증강 데이터 박스플롯 (뒤에 배치)
         fig.add_trace(go.Box(
             y=df_aug[column],
             name='증강 데이터',
             marker_color='lightcoral'  # 연한 빨강
+        ))
+        
+        # 원본 데이터 박스플롯 (앞에 배치)
+        fig.add_trace(go.Box(
+            y=df_orig[column],
+            name='원본 데이터',
+            marker_color='lightblue'  # 연한 파랑
         ))
         
         fig.update_layout(
@@ -84,22 +84,22 @@ class DataVisualizer:
         """겹쳐진 산점도를 생성합니다."""
         fig = go.Figure()
         
-        # 원본 데이터 산점도
-        fig.add_trace(go.Scatter(
-            x=df_orig[x_col],
-            y=df_orig[y_col],
-            mode='markers',
-            name='원본 데이터',
-            marker=dict(color='lightblue', opacity=0.6)  # 연한 파랑
-        ))
-        
-        # 증강 데이터 산점도
+        # 증강 데이터 산점도 (뒤에 배치)
         fig.add_trace(go.Scatter(
             x=df_aug[x_col],
             y=df_aug[y_col],
             mode='markers',
             name='증강 데이터',
             marker=dict(color='lightcoral', opacity=0.6)  # 연한 빨강
+        ))
+        
+        # 원본 데이터 산점도 (앞에 배치)
+        fig.add_trace(go.Scatter(
+            x=df_orig[x_col],
+            y=df_orig[y_col],
+            mode='markers',
+            name='원본 데이터',
+            marker=dict(color='lightblue', opacity=0.6)  # 연한 파랑
         ))
         
         fig.update_layout(
@@ -128,7 +128,6 @@ class DataVisualizer:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**원본 데이터 클래스 분포**")
             orig_counts = df_orig[target_col].value_counts()
             fig_orig = px.pie(
                 values=orig_counts.values,
@@ -138,7 +137,6 @@ class DataVisualizer:
             st.plotly_chart(fig_orig, use_container_width=True)
         
         with col2:
-            st.markdown("**증강 데이터 클래스 분포**")
             aug_counts = df_aug[target_col].value_counts()
             fig_aug = px.pie(
                 values=aug_counts.values,
@@ -149,8 +147,6 @@ class DataVisualizer:
     
     def display_comparison_summary(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, numeric_cols: List[str]):
         """증강 전후 비교 요약을 표시합니다."""
-        st.markdown("**📋 증강 전후 비교 요약**")
-        
         summary_data = []
         for col in numeric_cols:
             orig_mean = df_orig[col].mean()
@@ -167,6 +163,38 @@ class DataVisualizer:
                 '증강 표준편차': f"{aug_std:.3f}",
                 '표준편차 변화': f"{aug_std - orig_std:.3f}"
             })
+        
+        summary_df = pd.DataFrame(summary_data)
+        st.dataframe(summary_df, use_container_width=True)
+    
+    def display_scatter_summary(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, x_col: str, y_col: str):
+        """산점도 비교 요약을 표시합니다."""
+        st.markdown("""
+        **📈 산점도 통계 해석 가이드:**
+        - **상관계수**: -1~1, 1에 가까울수록 강한 양의 상관관계
+        - **데이터 포인트**: 산점도에 표시되는 점의 개수
+        - **변화량**: 양수 = 증가, 음수 = 감소
+        """)
+        
+        # 상관계수 계산
+        orig_corr = df_orig[x_col].corr(df_orig[y_col])
+        aug_corr = df_aug[x_col].corr(df_aug[y_col])
+        corr_change = aug_corr - orig_corr
+        
+        # 데이터 포인트 수
+        orig_points = len(df_orig)
+        aug_points = len(df_aug)
+        points_increase = aug_points - orig_points
+        points_increase_pct = (points_increase / orig_points) * 100
+        
+        # 통계 요약표 생성
+        summary_data = {
+            '지표': ['상관계수', '데이터 포인트'],
+            '원본': [f"{orig_corr:.3f}", f"{orig_points:,}개"],
+            '증강': [f"{aug_corr:.3f}", f"{aug_points:,}개"],
+            '변화량': [f"{corr_change:.3f}", f"{points_increase:,}개"],
+            '변화율': [f"{corr_change/orig_corr*100:.1f}%" if orig_corr != 0 else "N/A", f"{points_increase_pct:.1f}%"]
+        }
         
         summary_df = pd.DataFrame(summary_data)
         st.dataframe(summary_df, use_container_width=True)
@@ -226,7 +254,6 @@ class DataVisualizer:
         # 메인 제목
         st.markdown("---")
         st.markdown("## 📊 증강 결과 리포트")
-        st.markdown("*데이터 증강 과정과 결과를 종합적으로 분석한 리포트입니다.*")
         
         # 1. 핵심 지표 카드
         st.markdown("### 🎯 핵심 지표")
@@ -272,45 +299,4 @@ class DataVisualizer:
                 <p style="margin: 0; color: #666;">새로운 데이터</p>
             </div>
             """.format(increase_count), unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # 2. 증강 방법 요약
-        st.markdown("### 🔧 적용된 증강 방법")
-        
-        methods_used = []
-        method_icons = {
-            'noise': '🔊',
-            'duplicate': '📋',
-            'feature': '📊',
-            'smote': '⚖️',
-            'drop': '🗑️',
-            'general': '🔄'
-        }
-        
-        if 'noise' in params.get('methods', []):
-            methods_used.append(f"{method_icons['noise']} **노이즈 추가** (레벨: {params.get('noise_level', 'N/A')})")
-        if 'duplicate' in params.get('methods', []):
-            methods_used.append(f"{method_icons['duplicate']} **데이터 중복** (횟수: {params.get('dup_count', 'N/A')})")
-        if 'feature' in params.get('methods', []):
-            methods_used.append(f"{method_icons['feature']} **특성 기반 증강** (비율: {params.get('feature_ratio', 'N/A')})")
-        if 'smote' in params.get('methods', []):
-            methods_used.append(f"{method_icons['smote']} **SMOTE** (타겟: {params.get('target_col', 'N/A')})")
-        if 'drop' in params.get('methods', []):
-            methods_used.append(f"{method_icons['drop']} **데이터 삭제** (비율: {params.get('drop_rate', 'N/A')})")
-        if 'general' in params.get('methods', []):
-            methods_used.append(f"{method_icons['general']} **일반 증강** (비율: {params.get('augmentation_ratio', 'N/A')})")
-        
-        # 증강 방법을 카드 형태로 표시
-        if methods_used:
-            cols = st.columns(min(3, len(methods_used)))
-            for i, method in enumerate(methods_used):
-                with cols[i % 3]:
-                    st.markdown(f"""
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 5px 0; border: 1px solid #dee2e6;">
-                        <p style="margin: 0; font-size: 14px;">{method}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-        else:
-            st.info("⚠️ 적용된 증강 방법이 없습니다.")
         
