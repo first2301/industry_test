@@ -134,6 +134,100 @@ if uploaded_file is not None:
         numeric_cols = visualizer.get_numeric_columns(df)
         categorical_cols = visualizer.get_categorical_columns(df)
 
+        # ===== 데이터 분석 =====
+        st.markdown("---")
+        st.subheader("📊 데이터 분석")
+        
+        # 탭으로 구분된 분석 섹션
+        tab1, tab2, tab3 = st.tabs(["📋 데이터 미리보기", "📈 기본 정보", "🔍 품질 분석"])
+        
+        with tab1:
+            st.markdown("### 원본 데이터 미리보기")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                preview_rows = st.slider("미리보기 행 수", 5, 50, 10, help="원본 데이터에서 보여줄 행 수를 선택하세요")
+            with col2:
+                st.write("")  # 공간 맞추기
+                st.write("")  # 공간 맞추기
+                if st.button("🔄 새로고침", help="데이터 미리보기를 새로고침합니다"):
+                    st.rerun()
+            
+            st.dataframe(df.head(preview_rows), use_container_width=True)
+            
+            # 데이터 요약 정보
+            with st.expander("📊 데이터 요약 정보"):
+                st.write(f"**데이터 형태**: {df.shape[0]}행 × {df.shape[1]}열")
+                st.write(f"**메모리 사용량**: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
+                st.write(f"**데이터 타입**: {df.dtypes.value_counts().to_dict()}")
+        
+        with tab2:
+            st.markdown("### 기본 데이터 정보")
+            
+            # 주요 메트릭
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("총 행 수", f"{len(df):,}", help="데이터셋의 총 행 수")
+            with col2:
+                st.metric("총 컬럼 수", f"{len(df.columns)}", help="데이터셋의 총 컬럼 수")
+            with col3:
+                st.metric("수치형 컬럼", f"{len(numeric_cols)}", help="수치형 데이터 컬럼 수")
+            with col4:
+                st.metric("범주형 컬럼", f"{len(categorical_cols)}", help="범주형 데이터 컬럼 수")
+            
+            # 컬럼 정보 상세
+            st.markdown("### 컬럼 상세 정보")
+            col_info = []
+            for col in df.columns:
+                col_type = "수치형" if col in numeric_cols else "범주형"
+                unique_count = df[col].nunique()
+                missing_count = df[col].isnull().sum()
+                col_info.append({
+                    "컬럼명": col,
+                    "데이터 타입": col_type,
+                    "고유값 수": unique_count,
+                    "결측값 수": missing_count,
+                    "결측률(%)": f"{(missing_count/len(df)*100):.1f}%"
+                })
+            
+            col_info_df = pd.DataFrame(col_info)
+            st.dataframe(col_info_df, use_container_width=True)
+        
+        with tab3:
+            st.markdown("### 데이터 품질 분석")
+            
+            # 결측값 분석
+            missing_data = df.isnull().sum()
+            missing_pct = (missing_data / len(df)) * 100
+            missing_df = pd.DataFrame({
+                '컬럼': missing_data.index,
+                '결측값 수': missing_data.values,
+                '결측률(%)': missing_pct.values
+            }).sort_values('결측률(%)', ascending=False)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**결측값 분석**")
+                if missing_df['결측값 수'].sum() == 0:
+                    st.success("✅ 결측값이 없습니다.")
+                else:
+                    st.dataframe(missing_df[missing_df['결측값 수'] > 0], use_container_width=True)
+                    st.warning(f"⚠️ 총 {missing_df['결측값 수'].sum():,}개의 결측값이 있습니다.")
+            
+            # 중복값 분석
+            with col2:
+                st.markdown("**중복값 분석**")
+                duplicate_count = df.duplicated().sum()
+                duplicate_pct = (duplicate_count / len(df)) * 100
+                st.metric("중복 행 수", f"{duplicate_count:,} ({duplicate_pct:.1f}%)")
+                if duplicate_count == 0:
+                    st.success("✅ 중복값이 없습니다.")
+                else:
+                    st.warning(f"⚠️ 중복값이 {duplicate_pct:.1f}% 있습니다.")
+                    if st.button("중복 행 보기", help="중복된 행들을 확인합니다"):
+                        st.dataframe(df[df.duplicated()], use_container_width=True)
+        
+
+
         # ===== 증강 파라미터 설정 =====
         # 사이드바에서 파라미터 설정 (임시로 직접 정의된 메서드 사용)
         params, selected_methods = setup_augmentation_parameters(categorical_cols, numeric_cols, df)
