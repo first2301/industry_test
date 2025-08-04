@@ -1,0 +1,6 @@
+streamlit
+pandas
+plotly
+imbalanced-learn
+numpy
+pillow

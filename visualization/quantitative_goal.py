@@ -16,7 +16,7 @@ if uploaded_file is not None:
     st.dataframe(data, use_container_width=True, height=300)    
     st.markdown("---")
 
-    # 스마트 타입 분류 함수
+    # 타입 분류 함수
     def smart_type_infer(df):
         numeric_cols, categorical_cols = [], []
         for col in df.columns:
