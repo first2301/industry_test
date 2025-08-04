@@ -34,20 +34,36 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
         imb_method = None
         
         if use_smote:
-            all_cols = categorical_cols + numeric_cols
-            target_col = st.selectbox("타겟(레이블) 컬럼 선택", all_cols, key="target_select")
+            st.markdown("**SMOTE 사용 시 반드시 타겟 레이블을 설정해야 합니다.**")
+            
+            # 범주형 컬럼 우선, 수치형 컬럼은 범주형으로 처리 가능한 경우만
+            smote_cols = categorical_cols.copy()
+            for col in numeric_cols:
+                unique_count = df[col].nunique()
+                if unique_count <= 20:  # 범주형으로 처리 가능한 수치형 컬럼
+                    smote_cols.append(col)
+            
+            if smote_cols:
+                target_col = st.selectbox(
+                    "타겟(레이블) 컬럼 선택", 
+                    smote_cols, 
+                    key="target_select",
+                    help="분류하고자 하는 클래스 레이블 컬럼을 선택하세요"
+                )
+                
+                if target_col:
+                    if target_col in numeric_cols:
+                        unique_count = df[target_col].nunique()
+                        st.success(f"✅ 수치형 컬럼을 범주형으로 처리 (고유값: {unique_count}개)")
+                    else:
+                        st.success(f"✅ 범주형 데이터")
+            else:
+                st.error("❌ SMOTE 사용을 위한 적절한 타겟 컬럼이 없습니다. 범주형 컬럼이나 고유값이 20개 이하인 수치형 컬럼이 필요합니다.")
+                use_smote = False
             
             if target_col:
-                if target_col in numeric_cols:
-                    unique_count = df[target_col].nunique()
-                    if unique_count > 20:
-                        st.warning("⚠️ 연속형 데이터로 보입니다.")
-                    else:
-                        st.success("✅ 범주형으로 처리 가능")
-                else:
-                    st.success(f"✅ 범주형 데이터")
-            
-            imb_method = st.selectbox("불균형 증강 방법", ["SMOTE", "RandomOverSampler", "RandomUnderSampler"], key="imb_method_select")
+                imb_method = "SMOTE"  # SMOTE만 사용
+                st.info("✅ SMOTE를 사용하여 불균형 데이터를 증강합니다.")
         
         # 노이즈 설정
         st.markdown("**3. 노이즈 설정**")
@@ -85,22 +101,11 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
             2, 10, 2, 
             help="전체 데이터를 몇 번 복제할지 설정"
         )
-        
-
-        
-        # 데이터 삭제 설정
-        st.markdown("**5. 데이터 삭제 설정**")
-        use_drop = st.checkbox("데이터 삭제 사용", value=False, help="과적합 방지를 위해 일부 데이터를 삭제합니다.")
-        drop_rate = None
-        if use_drop:
-            drop_rate = st.slider("삭제 비율", 0.01, 0.5, 0.1, step=0.01, help="랜덤하게 삭제할 데이터의 비율")
     
     # 기본 증강 방법 설정
     selected_methods = ['noise', 'duplicate', 'feature']
     if use_smote and target_col:
         selected_methods.append('smote')
-    if use_drop:
-        selected_methods.append('drop')
     selected_methods.append('general')
     
     # 파라미터 딕셔너리 생성
@@ -110,8 +115,6 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
         'augmentation_ratio': augmentation_ratio
     }
     
-    if use_drop and drop_rate is not None:
-        params['drop_rate'] = drop_rate
     if use_smote and target_col:
         params['target_col'] = target_col
         params['imb_method'] = imb_method
@@ -135,17 +138,45 @@ if uploaded_file is not None:
         # 사이드바에서 파라미터 설정 (임시로 직접 정의된 메서드 사용)
         params, selected_methods = setup_augmentation_parameters(categorical_cols, numeric_cols, df)
         
-        # ===== 데이터 증강 실행 =====
-        df_aug = augmenter._combined_augmentation(df, methods=selected_methods, **params)
+        # ===== 데이터 증강 버튼 =====
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**데이터 증강 실행**")
         
-        # ===== 증강 전후 비교 섹션 =====
-        st.markdown("---")
-        st.subheader("1. 증강 전후 비교")
+        # 증강 버튼
+        augment_button = st.sidebar.button(
+            "🚀 데이터 증강 시작", 
+            type="primary",
+            help="설정한 파라미터로 데이터 증강을 실행합니다",
+            use_container_width=True
+        )
         
-        # ===== 클래스 분포 비교 (SMOTE 사용 시) =====
-        if 'smote' in selected_methods and 'target_col' in params and params['target_col'] in categorical_cols:
-            st.markdown("### 1-1. 클래스 분포 비교")
-            visualizer.compare_distributions(df, df_aug, params['target_col'])
+        # 증강 실행 여부를 세션 상태로 관리
+        if 'augmentation_executed' not in st.session_state:
+            st.session_state.augmentation_executed = False
+        if 'df_augmented' not in st.session_state:
+            st.session_state.df_augmented = None
+        
+        # 버튼 클릭 시 증강 실행
+        if augment_button:
+            st.sidebar.info("🔄 데이터 증강 중...")
+            st.session_state.df_augmented = augmenter._combined_augmentation(df, methods=selected_methods, **params)
+            st.session_state.augmentation_executed = True
+            st.sidebar.success("✅ 데이터 증강 완료!")
+        
+        # 증강된 데이터가 있으면 시각화 실행
+        if st.session_state.augmentation_executed and st.session_state.df_augmented is not None:
+            df_aug = st.session_state.df_augmented
+            
+            # ===== 증강 전후 비교 섹션 =====
+            st.markdown("---")
+            st.subheader("1. 증강 전후 비교")
+        else:
+            # 증강이 실행되지 않은 경우 안내 메시지
+            st.markdown("---")
+            st.info("ℹ️ 사이드바에서 파라미터를 설정하고 '🚀 데이터 증강 시작' 버튼을 클릭하여 증강을 실행하세요.")
+            st.stop()
+        
+
 
         # ===== 수치형 데이터 시각화 =====
         if numeric_cols:
@@ -178,11 +209,6 @@ if uploaded_file is not None:
                     # 산점도 통계 요약 (임시로 직접 정의)
                     st.markdown("### 1-6. 산점도 통계 요약")
                     
-                    # 상관계수 계산
-                    orig_corr = df[x_col_overlap].corr(df[y_col_overlap])
-                    aug_corr = df_aug[x_col_overlap].corr(df_aug[y_col_overlap])
-                    corr_change = aug_corr - orig_corr
-                    
                     # 데이터 포인트 수
                     orig_points = len(df)
                     aug_points = len(df_aug)
@@ -191,11 +217,11 @@ if uploaded_file is not None:
                     
                     # 통계 요약표 생성
                     summary_data = {
-                        '지표': ['상관계수', '데이터 포인트'],
-                        '원본': [f"{orig_corr:.3f}", f"{orig_points:,}개"],
-                        '증강': [f"{aug_corr:.3f}", f"{aug_points:,}개"],
-                        '변화량': [f"{corr_change:.3f}", f"{points_increase:,}개"],
-                        '변화율': [f"{corr_change/orig_corr*100:.1f}%" if orig_corr != 0 else "N/A", f"{points_increase_pct:.1f}%"]
+                        '지표': ['데이터 포인트'],
+                        '원본': [f"{orig_points:,}개"],
+                        '증강': [f"{aug_points:,}개"],
+                        '증가량': [f"{points_increase:,}개"],
+                        '증가율': [f"{points_increase_pct:.1f}%"]
                     }
                     
                     summary_df = pd.DataFrame(summary_data)
@@ -207,7 +233,18 @@ if uploaded_file is not None:
 
         if filtered_categorical_cols:
             st.markdown("### 2. 범주형 데이터 비교")
-            selected_cat_compare = st.selectbox("비교할 범주형 컬럼 선택", filtered_categorical_cols, key="cat_compare_select")
+            
+            # SMOTE 사용 시 타겟 컬럼을 기본값으로 설정
+            default_cat_col = None
+            if 'smote' in selected_methods and 'target_col' in params and params['target_col'] in categorical_cols:
+                default_cat_col = params['target_col']
+            
+            # default_cat_col이 filtered_categorical_cols에 있는지 확인
+            default_index = 0
+            if default_cat_col and default_cat_col in filtered_categorical_cols:
+                default_index = filtered_categorical_cols.index(default_cat_col)
+            
+            selected_cat_compare = st.selectbox("비교할 범주형 컬럼 선택", filtered_categorical_cols, key="cat_compare_select", index=default_index)
             
             # 원본 데이터 카운트
             orig_counts = df[selected_cat_compare].value_counts().sort_index()
@@ -238,7 +275,7 @@ if uploaded_file is not None:
                 y=['원본', '증강'],
                 title=f'{selected_cat_compare} 분포 비교 (원본 vs 증강)',
                 barmode='group',
-                color_discrete_map={'원본': '#1f77b4', '증강': '#ff7f0e'}
+                color_discrete_map={'원본': '#87CEEB', '증강': '#FFB6C1'}
             )
             
             fig_overlap.update_layout(
@@ -254,7 +291,6 @@ if uploaded_file is not None:
             st.markdown("**통계 요약**")
             st.dataframe(comparison_df, use_container_width=True)
         
-
         # ===== 증강 결과 리포트 =====
         report_params = params.copy()
         report_params['methods'] = selected_methods
