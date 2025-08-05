@@ -1,265 +1,87 @@
+"""
+시각화 서비스 레이어
+lib의 visualization 모듈을 호출하여 시각화 기능을 제공합니다.
+"""
+
 import pandas as pd
-import numpy as np
-import sys
-import os
-from typing import Dict, List, Any, Optional
-import logging
+from typing import List, Dict, Any, Optional
 import json
+import base64
+from io import BytesIO
 
-# 상위 디렉토리를 Python 경로에 추가
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..lib.visualization import DataVisualizer
 
-from lib import DataVisualizer
-
-logger = logging.getLogger(__name__)
 
 class VisualizationService:
+    """시각화 서비스 클래스"""
+    
     def __init__(self):
+        """초기화"""
         self.visualizer = DataVisualizer()
     
-    def create_histogram_comparison(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, column: str) -> Dict[str, Any]:
+    def get_numeric_columns(self, df: pd.DataFrame) -> List[str]:
+        """수치형 컬럼 목록을 반환합니다."""
+        return self.visualizer.get_numeric_columns(df)
+    
+    def get_categorical_columns(self, df: pd.DataFrame) -> List[str]:
+        """범주형 컬럼 목록을 반환합니다."""
+        return self.visualizer.get_categorical_columns(df)
+    
+    def create_histogram_comparison(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, column: str) -> Dict[str, Any]:
         """히스토그램 비교 차트를 생성합니다."""
-        try:
-            if column not in original_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 원본 데이터에 존재하지 않습니다.'
-                }
-            
-            if column not in augmented_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 증강된 데이터에 존재하지 않습니다.'
-                }
-            
-            # Plotly 차트 생성
-            fig = self.visualizer.create_overlapping_histogram(original_df, augmented_df, column)
-            
-            # 차트 데이터를 JSON으로 변환
-            chart_data = json.loads(fig.to_json())
-            
-            return {
-                'success': True,
-                'chart_type': 'histogram_comparison',
-                'column': column,
-                'chart_data': chart_data
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating histogram comparison for {column}: {e}")
-            return {
-                'success': False,
-                'error': f'히스토그램 비교 차트 생성 중 오류가 발생했습니다.'
-            }
+        fig = self.visualizer.create_overlapping_histogram(df_orig, df_aug, column)
+        return self._fig_to_dict(fig)
     
-    def create_boxplot_comparison(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, column: str) -> Dict[str, Any]:
+    def create_boxplot_comparison(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, column: str) -> Dict[str, Any]:
         """박스플롯 비교 차트를 생성합니다."""
-        try:
-            if column not in original_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 원본 데이터에 존재하지 않습니다.'
-                }
-            
-            if column not in augmented_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 증강된 데이터에 존재하지 않습니다.'
-                }
-            
-            # Plotly 차트 생성
-            fig = self.visualizer.create_overlapping_boxplot(original_df, augmented_df, column)
-            
-            # 차트 데이터를 JSON으로 변환
-            chart_data = json.loads(fig.to_json())
-            
-            return {
-                'success': True,
-                'chart_type': 'boxplot_comparison',
-                'column': column,
-                'chart_data': chart_data
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating boxplot comparison for {column}: {e}")
-            return {
-                'success': False,
-                'error': f'박스플롯 비교 차트 생성 중 오류가 발생했습니다.'
-            }
+        fig = self.visualizer.create_overlapping_boxplot(df_orig, df_aug, column)
+        return self._fig_to_dict(fig)
     
-    def create_scatter_comparison(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, x_col: str, y_col: str) -> Dict[str, Any]:
+    def create_scatter_comparison(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, x_col: str, y_col: str) -> Dict[str, Any]:
         """산점도 비교 차트를 생성합니다."""
-        try:
-            # 컬럼 존재 확인
-            for col in [x_col, y_col]:
-                if col not in original_df.columns:
-                    return {
-                        'success': False,
-                        'error': f'컬럼 "{col}"이 원본 데이터에 존재하지 않습니다.'
-                    }
-                if col not in augmented_df.columns:
-                    return {
-                        'success': False,
-                        'error': f'컬럼 "{col}"이 증강된 데이터에 존재하지 않습니다.'
-                    }
-            
-            # Plotly 차트 생성
-            fig = self.visualizer.create_overlapping_scatter(original_df, augmented_df, x_col, y_col)
-            
-            # 차트 데이터를 JSON으로 변환
-            chart_data = json.loads(fig.to_json())
-            
-            return {
-                'success': True,
-                'chart_type': 'scatter_comparison',
-                'x_column': x_col,
-                'y_column': y_col,
-                'chart_data': chart_data
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating scatter comparison: {e}")
-            return {
-                'success': False,
-                'error': f'산점도 비교 차트 생성 중 오류가 발생했습니다.'
-            }
+        fig = self.visualizer.create_overlapping_scatter(df_orig, df_aug, x_col, y_col)
+        return self._fig_to_dict(fig)
     
-    def create_categorical_comparison(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, column: str) -> Dict[str, Any]:
-        """범주형 데이터 비교 차트를 생성합니다."""
-        try:
-            if column not in original_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 원본 데이터에 존재하지 않습니다.'
-                }
-            
-            if column not in augmented_df.columns:
-                return {
-                    'success': False,
-                    'error': f'컬럼 "{column}"이 증강된 데이터에 존재하지 않습니다.'
-                }
-            
-            # 원본 데이터 카운트
-            orig_counts = original_df[column].value_counts().sort_index()
-            aug_counts = augmented_df[column].value_counts().sort_index()
-            
-            # 모든 카테고리 통합
-            all_categories = sorted(set(orig_counts.index) | set(aug_counts.index))
-            
-            # 데이터 준비
-            comparison_data = []
-            for cat in all_categories:
-                orig_count = orig_counts.get(cat, 0)
-                aug_count = aug_counts.get(cat, 0)
-                comparison_data.append({
-                    'category': cat,
-                    'original': orig_count,
-                    'augmented': aug_count,
-                    'increase': aug_count - orig_count,
-                    'increase_percentage': ((aug_count - orig_count) / orig_count * 100) if orig_count > 0 else float('inf')
-                })
-            
-            return {
-                'success': True,
-                'chart_type': 'categorical_comparison',
-                'column': column,
-                'comparison_data': comparison_data,
-                'categories': all_categories
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating categorical comparison for {column}: {e}")
-            return {
-                'success': False,
-                'error': f'범주형 비교 차트 생성 중 오류가 발생했습니다.'
-            }
+    def create_categorical_chart(self, df: pd.DataFrame, column: str, chart_type: str = "막대그래프") -> Dict[str, Any]:
+        """범주형 차트를 생성합니다."""
+        fig = self.visualizer.create_categorical_visualization(df, column, chart_type)
+        return self._fig_to_dict(fig)
     
-    def get_comparison_summary(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, numeric_columns: List[str]) -> Dict[str, Any]:
-        """비교 요약 통계를 생성합니다."""
-        try:
-            summary_stats = {}
-            
-            for col in numeric_columns:
-                if col in original_df.columns and col in augmented_df.columns:
-                    orig_stats = original_df[col].describe()
-                    aug_stats = augmented_df[col].describe()
-                    
-                    summary_stats[col] = {
-                        'original': {
-                            'count': int(orig_stats['count']),
-                            'mean': float(orig_stats['mean']),
-                            'std': float(orig_stats['std']),
-                            'min': float(orig_stats['min']),
-                            'max': float(orig_stats['max']),
-                            'median': float(original_df[col].median())
-                        },
-                        'augmented': {
-                            'count': int(aug_stats['count']),
-                            'mean': float(aug_stats['mean']),
-                            'std': float(aug_stats['std']),
-                            'min': float(aug_stats['min']),
-                            'max': float(aug_stats['max']),
-                            'median': float(augmented_df[col].median())
-                        },
-                        'changes': {
-                            'count_change': int(aug_stats['count'] - orig_stats['count']),
-                            'mean_change': float(aug_stats['mean'] - orig_stats['mean']),
-                            'std_change': float(aug_stats['std'] - orig_stats['std']),
-                            'range_change': float((aug_stats['max'] - aug_stats['min']) - (orig_stats['max'] - orig_stats['min']))
-                        }
-                    }
-            
-            return {
-                'success': True,
-                'summary_stats': summary_stats,
-                'columns_analyzed': list(summary_stats.keys())
-            }
-            
-        except Exception as e:
-            logger.error(f"Error generating comparison summary: {e}")
-            return {
-                'success': False,
-                'error': '비교 요약 생성 중 오류가 발생했습니다.'
-            }
+    def create_comparison_dashboard(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, 
+                                  numeric_cols: List[str], categorical_cols: List[str]) -> Dict[str, Any]:
+        """비교 대시보드를 생성합니다."""
+        fig = self.visualizer.create_comparison_dashboard(df_orig, df_aug, numeric_cols, categorical_cols)
+        return self._fig_to_dict(fig)
     
-    def create_augmentation_report(self, original_df: pd.DataFrame, augmented_df: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, Any]:
-        """증강 결과 리포트를 생성합니다."""
+    def create_augmentation_report(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, 
+                                 params: Dict[str, Any]) -> Dict[str, Any]:
+        """증강 리포트를 생성합니다."""
+        fig = self.visualizer.create_augmentation_report(df_orig, df_aug, params)
+        return self._fig_to_dict(fig)
+    
+    def get_comparison_summary(self, df_orig: pd.DataFrame, df_aug: pd.DataFrame, 
+                             numeric_cols: List[str]) -> Dict[str, Any]:
+        """비교 요약 정보를 반환합니다."""
+        summary = self.visualizer.display_comparison_summary(df_orig, df_aug, numeric_cols)
+        return {"summary": summary}
+    
+    def _fig_to_dict(self, fig) -> Dict[str, Any]:
+        """Plotly Figure를 딕셔너리로 변환합니다."""
+        # JSON으로 직렬화 가능한 형태로 변환
+        fig_dict = fig.to_dict()
+        
+        # 이미지 변환 시도 (kaleido 의존성이 있을 경우)
+        img_base64 = None
         try:
-            # 기본 정보
-            report = {
-                'original_shape': {'rows': len(original_df), 'columns': len(original_df.columns)},
-                'augmented_shape': {'rows': len(augmented_df), 'columns': len(augmented_df.columns)},
-                'augmentation_ratio': len(augmented_df) / len(original_df) - 1,
-                'parameters_used': params,
-                'timestamp': pd.Timestamp.now().isoformat()
-            }
-            
-            # 컬럼 타입 분석
-            numeric_cols = self.visualizer.get_numeric_columns(original_df)
-            categorical_cols = self.visualizer.get_categorical_columns(original_df)
-            
-            report['column_analysis'] = {
-                'numeric_columns': numeric_cols,
-                'categorical_columns': categorical_cols,
-                'total_columns': len(original_df.columns)
-            }
-            
-            # 품질 지표
-            report['quality_metrics'] = {
-                'original_missing_rate': (original_df.isnull().sum().sum() / (len(original_df) * len(original_df.columns))) * 100,
-                'augmented_missing_rate': (augmented_df.isnull().sum().sum() / (len(augmented_df) * len(augmented_df.columns))) * 100,
-                'original_duplicates': original_df.duplicated().sum(),
-                'augmented_duplicates': augmented_df.duplicated().sum()
-            }
-            
-            return {
-                'success': True,
-                'report': report
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating augmentation report: {e}")
-            return {
-                'success': False,
-                'error': '증강 리포트 생성 중 오류가 발생했습니다.'
-            } 
+            img_bytes = fig.to_image(format="png")
+            img_base64 = base64.b64encode(img_bytes).decode()
+        except Exception:
+            # kaleido가 설치되지 않았거나 이미지 생성에 실패한 경우
+            pass
+        
+        return {
+            "figure": fig_dict,
+            "image_base64": img_base64,
+            "layout": fig_dict.get("layout", {}),
+            "data": fig_dict.get("data", [])
+        } 

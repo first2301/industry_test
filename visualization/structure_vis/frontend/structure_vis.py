@@ -525,10 +525,3 @@ else:
         - **CSV 파일 형식**만 지원됩니다
         """)
     
-    # 백엔드 연결 상태 확인
-    if st.button("🔗 백엔드 연결 확인"):
-        response = call_backend_api("/health")
-        if response:
-            st.success("✅ 백엔드 서버에 연결되었습니다!")
-        else:
-            st.error("❌ 백엔드 서버에 연결할 수 없습니다. 백엔드를 먼저 실행해주세요.")
