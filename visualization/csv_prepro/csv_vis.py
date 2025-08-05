@@ -52,18 +52,12 @@ def setup_augmentation_parameters(categorical_cols, numeric_cols, df):
                 )
                 
                 if target_col:
-                    if target_col in numeric_cols:
-                        unique_count = df[target_col].nunique()
-                        st.success(f"✅ 수치형 컬럼을 범주형으로 처리 (고유값: {unique_count}개)")
-                    else:
-                        st.success(f"✅ 범주형 데이터")
+                    pass  # 메시지 제거
             else:
-                st.error("❌ SMOTE 사용을 위한 적절한 타겟 컬럼이 없습니다. 범주형 컬럼이나 고유값이 20개 이하인 수치형 컬럼이 필요합니다.")
                 use_smote = False
             
             if target_col:
                 imb_method = "SMOTE"  # SMOTE만 사용
-                st.info("✅ SMOTE를 사용하여 불균형 데이터를 증강합니다.")
         
         # 노이즈 설정
         st.markdown("**3. 노이즈 설정**")
@@ -145,21 +139,28 @@ if uploaded_file is not None:
             st.markdown("### 원본 데이터 미리보기")
             col1, col2 = st.columns([3, 1])
             with col1:
-                preview_rows = st.slider("미리보기 행 수", 5, 50, 10, help="원본 데이터에서 보여줄 행 수를 선택하세요")
+                preview_rows = st.slider(
+                    "미리보기 행 수", 
+                    5, 50, 10, 
+                    help="원본 데이터에서 보여줄 행 수를 선택하세요", 
+                )
             with col2:
                 st.write("")  # 공간 맞추기
                 st.write("")  # 공간 맞추기
-                if st.button("🔄 새로고침", help="데이터 미리보기를 새로고침합니다"):
-                    st.rerun()
             
             st.dataframe(df.head(preview_rows), use_container_width=True)
             
             # 데이터 요약 정보
             with st.expander("📊 데이터 요약 정보"):
                 st.write(f"**데이터 형태**: {df.shape[0]}행 × {df.shape[1]}열")
-                st.write(f"**메모리 사용량**: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
-                st.write(f"**데이터 타입**: {df.dtypes.value_counts().to_dict()}")
-        
+                # 데이터 타입별로 컬럼명을 함께 보여주어 직관적으로 표시
+                st.write("**데이터 타입 분포**:")
+                dtype_info = {}
+                for dtype in df.dtypes.unique():
+                    cols = df.columns[df.dtypes == dtype].tolist()
+                    dtype_info[str(dtype)] = cols
+                for dtype, cols in dtype_info.items():
+                    st.write(f"- **{dtype}**: {len(cols)}개 | {', '.join(cols)}")
         with tab2:
             st.markdown("### 기본 데이터 정보")
             
@@ -178,7 +179,7 @@ if uploaded_file is not None:
             st.markdown("### 컬럼 상세 정보")
             col_info = []
             for col in df.columns:
-                col_type = "수치형" if col in numeric_cols else "범주형"
+                col_type = "Numeric" if col in numeric_cols else "Categorical"
                 unique_count = df[col].nunique()
                 missing_count = df[col].isnull().sum()
                 col_info.append({

@@ -69,16 +69,31 @@ class DataAugmenter:
     def _handle_imbalanced_data(self, df, target_col=None, imb_method=None):
         """클래스 불균형 데이터를 처리합니다."""
         if target_col is None or target_col not in df.columns:
-            st.warning("타겟(레이블) 컬럼을 선택해주세요.")
             return df
         
         # 타겟 컬럼이 범주형인지 확인
         if pd.api.types.is_numeric_dtype(df[target_col]):
-            # 고유값 개수로 범주형 여부 판단 (고유값이 20개 이하면 범주형으로 간주)
-            unique_count = df[target_col].nunique()
-            if unique_count > 20:
-                st.error(f"❌ 선택한 타겟 컬럼 '{target_col}'은 연속형 수치 데이터입니다.")
-                st.info("💡 SMOTE는 분류 문제(범주형 타겟)에서만 사용할 수 있습니다.")
+            unique_values = df[target_col].unique()
+            unique_count = len(unique_values)
+            
+            # 이진형 데이터 체크 (0과 1로만 구성된 경우)
+            is_binary = set(unique_values).issubset({0, 1}) or set(unique_values).issubset({0.0, 1.0})
+            
+            # 범주형 데이터 체크 (정수로 레이블링된 경우)
+            is_categorical = (
+                unique_count <= 20 and  # 고유값이 20개 이하
+                all(isinstance(val, (int, np.integer)) for val in unique_values) and  # 모든 값이 정수
+                min(unique_values) >= 0 and  # 최소값이 0 이상
+                max(unique_values) < unique_count  # 최대값이 고유값 개수보다 작음
+            )
+            
+            if is_binary:
+                pass  # 메시지 제거
+            elif is_categorical:
+                pass  # 메시지 제거
+            elif unique_count <= 20:
+                pass  # 메시지 제거
+            else:
                 return df
         
         X = df.drop(columns=[target_col])
@@ -92,7 +107,6 @@ class DataAugmenter:
         numeric_columns = X.select_dtypes(include=[np.number]).columns.tolist()
         
         if len(numeric_columns) == 0:
-            st.warning("⚠️ 수치형 컬럼이 없어 SMOTE를 적용할 수 없습니다.")
             return df
         
         X_numeric = X[numeric_columns]
@@ -104,10 +118,9 @@ class DataAugmenter:
                 if k_neighbors < 1:
                     k_neighbors = 1
                 
-                # 클래스별 샘플 수가 너무 적은 경우 경고
+                # 클래스별 샘플 수가 너무 적은 경우 조정 (메시지 제거)
                 if min_samples < 5:
-                    st.warning(f"⚠️ 일부 클래스의 샘플 수가 적습니다. (최소: {min_samples}개)")
-                    st.info(f"💡 k_neighbors를 {k_neighbors}로 조정했습니다.")
+                    pass
                 
                 # SMOTE 적용 시 동적 설정 사용
                 sm = SMOTE(random_state=42, k_neighbors=k_neighbors, sampling_strategy='auto')
@@ -127,9 +140,6 @@ class DataAugmenter:
                         X_res_df[col] = X_res_df[col].clip(lower=lower_bound, upper=upper_bound)
                 
             except Exception as e:
-                st.error(f"❌ SMOTE 적용 오류: {str(e)}")
-                st.info("💡 클래스별 샘플 수가 부족하거나 데이터 특성상 SMOTE를 적용할 수 없습니다.")
-                st.info("💡 RandomOverSampler를 대신 사용해보세요.")
                 return df
                 
         elif imb_method == "RandomOverSampler":
@@ -138,7 +148,6 @@ class DataAugmenter:
                 X_res, y_res = ros.fit_resample(X_numeric, y)
                 X_res_df = pd.DataFrame(X_res, columns=numeric_columns)
             except Exception as e:
-                st.error(f"❌ RandomOverSampler 적용 오류: {str(e)}")
                 return df
                 
         elif imb_method == "RandomUnderSampler":
@@ -147,10 +156,8 @@ class DataAugmenter:
                 X_res, y_res = rus.fit_resample(X_numeric, y)
                 X_res_df = pd.DataFrame(X_res, columns=numeric_columns)
             except Exception as e:
-                st.error(f"❌ RandomUnderSampler 적용 오류: {str(e)}")
                 return df
         else:
-            st.warning("증강 방법을 선택해주세요.")
             return df
         
         # 원본 데이터와 동일한 구조로 결과 생성
@@ -178,7 +185,6 @@ class DataAugmenter:
         augment_count = int(len(df) * augmentation_ratio)
         
         if augment_count == 0:
-            st.warning("증강 비율이 너무 작습니다. 최소 1개 이상의 데이터가 증강됩니다.")
             augment_count = 1
         
         # 랜덤하게 데이터 선택하여 증강
@@ -203,7 +209,6 @@ class DataAugmenter:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
         if len(numeric_cols) == 0:
-            st.warning("수치형 컬럼이 없어 특성 기반 증강을 수행할 수 없습니다.")
             return df
         
         # 각 수치형 컬럼의 분포 분석
@@ -249,7 +254,6 @@ class DataAugmenter:
             result_df = pd.concat([df, augmented_df], ignore_index=True)
         else:
             result_df = df.copy()
-            st.warning("증강할 데이터를 생성할 수 없습니다.")
         
         return result_df
     
@@ -264,7 +268,6 @@ class DataAugmenter:
         # 각 증강 방법을 순차적으로 적용
         for i, method in enumerate(methods):
             if method not in self.augmentation_methods:
-                st.warning(f"⚠️ 알 수 없는 증강 방법: {method}")
                 continue
             
             try:
@@ -278,21 +281,17 @@ class DataAugmenter:
                         result_df = self.augmentation_methods[method](result_df, **method_kwargs)
                         applied_methods.append(f"SMOTE ({method_kwargs.get('imb_method', 'SMOTE')})")
                     else:
-                        st.warning("⚠️ SMOTE를 사용하려면 'target_col'을 지정해야 합니다.")
                         continue
                 else:
                     result_df = self.augmentation_methods[method](result_df, **method_kwargs)
                     applied_methods.append(self._get_method_display_name(method))
                 
             except Exception as e:
-                st.error(f"❌ {method} 증강 중 오류 발생: {str(e)}")
                 continue
         
         if applied_methods:
-            # st.success(f"✅ 조합 증강 완료! 데이터가 {len(df)}개에서 {len(result_df)}개로 증강되었습니다.")
             pass
         else:
-            st.warning("⚠️ 적용된 증강 방법이 없습니다.")
             result_df = df.copy()
         
         return result_df
