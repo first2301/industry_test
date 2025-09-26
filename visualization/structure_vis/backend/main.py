@@ -4,13 +4,12 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from .api.visualization_api import router as visualization_router
-from .api.data_augmentation_api import router as augmentation_router
+from api.data_augmentation_api import router as augmentation_router
 
 # FastAPI 애플리케이션 생성
 app = FastAPI(
-    title="데이터 시각화 및 증강 API",
-    description="데이터 시각화와 증강 기능을 제공하는 FastAPI 서버",
+    title="데이터 증강 API",
+    description="데이터 증강 기능을 제공하는 FastAPI 서버",
     version="1.0.0"
 )
 
@@ -24,8 +23,11 @@ app.add_middleware(
 )
 
 # API 라우터 등록
-app.include_router(visualization_router)
 app.include_router(augmentation_router)
+
+# API 문서 경로 수정
+app.title = "데이터 시각화 및 증강 API"
+app.description = "데이터 시각화와 증강 기능을 제공하는 FastAPI 서버"
 
 # 정적 파일 서빙 (favicon 등)
 try:
@@ -38,11 +40,10 @@ except:
 async def root():
     """루트 엔드포인트"""
     return {
-        "message": "데이터 시각화 및 증강 API 서버",
+        "message": "데이터 증강 API 서버",
         "version": "1.0.0",
         "endpoints": {
-            "visualization": "/visualization",
-            "augmentation": "/augmentation",
+            "augmentation": "/api",
             "docs": "/docs"
         }
     }
@@ -53,7 +54,7 @@ async def health_check():
     """전체 서비스 상태 확인"""
     return {
         "status": "healthy",
-        "service": "data_visualization_augmentation_api",
+        "service": "data_augmentation_api",
         "version": "1.0.0"
     }
 

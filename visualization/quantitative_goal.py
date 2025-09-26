@@ -12,7 +12,7 @@ if uploaded_file is not None:
     # CSV 파일 읽기
     data = pd.read_csv(uploaded_file)
     
-    st.title("Original Data")
+    st.title("데이터 분포 분석 및 시각화")
     st.dataframe(data, use_container_width=True, height=300)    
     st.markdown("---")
 
@@ -41,7 +41,7 @@ if uploaded_file is not None:
 
     # --- 컬럼 타입 직접 지정 UI ---
     with st.container():
-        st.title("📊 Data Visualization Dashboard")
+        st.title("📊 데이터 분포 분석 및 시각화")
         with st.expander("🔧 컬럼 타입 직접 지정", expanded=False):
             st.markdown("컬럼 타입이 잘못 분류된 경우, 아래에서 직접 선택해 주세요.")
             st.dataframe(pd.DataFrame({'컬럼명': data.columns, '타입': data.dtypes.astype(str)}))
@@ -174,15 +174,64 @@ if uploaded_file is not None:
             else:
                 st.info("두 개의 수치형 컬럼을 선택해주세요")
         st.markdown("---")
-        st.header("💡 컬럼별 시각화 추천")
-        st.markdown("각 컬럼에 적합한 시각화 방법을 추천합니다:")
-        if len(recommendations_df) > 0:
-            st.dataframe(recommendations_df, use_container_width=True, height=300)
+        st.header("📊 데이터 통계 요약")
+        
+        # 전체 데이터셋 정보
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("총 행 수", f"{data.shape[0]:,}")
+        with col2:
+            st.metric("총 열 수", f"{data.shape[1]:,}")
+        with col3:
+            missing_count = data.isnull().sum().sum()
+            st.metric("결측값 개수", f"{missing_count:,}")
+        with col4:
+            duplicate_count = data.duplicated().sum()
+            st.metric("중복 행 수", f"{duplicate_count:,}")
+        
+        st.markdown("---")
+        
+
+        # 상관관계 분석 (수치형 컬럼이 2개 이상일 때)
+        if len(numeric_cols) >= 2:
+            st.subheader("🔗 상관관계 분석")
+            correlation_matrix = data[numeric_cols].corr()
+            fig_corr = px.imshow(correlation_matrix, 
+                                text_auto=True, 
+                                aspect="auto",
+                                title="수치형 컬럼 간 상관관계",
+                                color_continuous_scale='RdBu_r')
+            fig_corr.update_layout(height=500)
+            st.plotly_chart(fig_corr, use_container_width=True)
         else:
-            st.warning("추천할 수 있는 컬럼이 없습니다.")
-        st.info("💡 **팁**: 수치형 데이터는 히스토그램과 박스플롯이, 범주형 데이터는 막대그래프와 파이차트가 적합합니다.")
+            st.info("상관관계 분석을 위해서는 최소 2개의 수치형 컬럼이 필요합니다.")
+
+        # 수치형 컬럼 통계 요약
+        if len(numeric_cols) > 0:
+            st.subheader("🔢 수치형 컬럼 통계")
+            numeric_stats = data[numeric_cols].describe()
+            st.dataframe(numeric_stats, use_container_width=True)
+            st.markdown("---")
+        
+        # 범주형 컬럼 통계 요약
+        if len(categorical_cols) > 0:
+            st.subheader("📝 범주형 컬럼 통계")
+            categorical_stats = []
+            for col in categorical_cols:
+                stats = {
+                    '컬럼명': col,
+                    '고유값 개수': data[col].nunique(),
+                    '최빈값': data[col].mode().iloc[0] if not data[col].mode().empty else 'N/A',
+                    '최빈값 빈도': data[col].value_counts().iloc[0] if len(data[col].value_counts()) > 0 else 0,
+                    '결측값 개수': data[col].isnull().sum()
+                }
+                categorical_stats.append(stats)
+            st.dataframe(pd.DataFrame(categorical_stats), use_container_width=True)
+            st.markdown("---")
+        
+
 else:
-    st.title("📊 Data Visualization Dashboard")
+    st.title("📊 데이터 분포 분석 및 시각화")
     st.markdown("---")
     st.info("👈 왼쪽 사이드바에서 CSV 파일을 업로드하여 데이터 시각화를 시작하세요!")
     with st.expander("📋 지원되는 데이터 형식"):

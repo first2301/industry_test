@@ -7,7 +7,7 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 import json
 
-from ..lib.data_augmentation import DataAugmenter
+from lib.data_augmentation import DataAugmenter
 
 
 class DataAugmentationService:

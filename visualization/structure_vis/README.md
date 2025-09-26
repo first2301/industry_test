@@ -6,29 +6,28 @@
 
 ```
 structure_vis/
-├── backend/                    # FastAPI 백엔드
+├── backend/                    # FastAPI 백엔드 (데이터 증강 전용)
 │   ├── main.py                # 메인 애플리케이션
 │   ├── requirements.txt       # 백엔드 의존성
-│   ├── README.md             # 백엔드 문서
 │   ├── api/                  # API 엔드포인트
 │   │   ├── __init__.py
-│   │   ├── visualization_api.py
 │   │   └── data_augmentation_api.py
 │   ├── services/             # 서비스 레이어
 │   │   ├── __init__.py
-│   │   ├── visualization_service.py
 │   │   └── data_augmentation_service.py
-│   └── lib/                  # 핵심 라이브러리
+│   └── lib/                  # 독립적인 라이브러리
 │       ├── __init__.py
-│       ├── visualization.py
 │       ├── data_augmentation.py
 │       └── data_utils.py
-├── frontend/                  # Streamlit 프론트엔드
-│   ├── app.py               # 메인 애플리케이션
-│   ├── requirements.txt     # 프론트엔드 의존성
-│   └── structure_vis.py     # 기존 애플리케이션 (참고용)
-├── run_app.py               # 통합 실행 스크립트
-└── README.md               # 프로젝트 문서
+├── frontend/                  # Streamlit 프론트엔드 (시각화 포함)
+│   ├── structure_vis.py      # 메인 애플리케이션
+│   ├── requirements.txt      # 프론트엔드 의존성
+│   └── src/                  # 프론트엔드 모듈
+│       ├── __init__.py
+│       └── visualization.py  # 시각화 모듈
+├── run_app.py                # 통합 실행 스크립트
+├── scafold.py                # 개별 실행 스크립트
+└── README.md                 # 프로젝트 문서
 ```
 
 ## 🚀 빠른 시작
@@ -40,25 +39,27 @@ cd structure_vis
 python run_app.py
 ```
 
-실행 스크립트에서 다음 옵션 중 선택할 수 있습니다:
-- **1**: 백엔드만 실행 (FastAPI 서버)
-- **2**: 프론트엔드만 실행 (Streamlit 앱)
-- **3**: 백엔드 + 프론트엔드 동시 실행 (권장)
-
 ### 2. 개별 실행
 
 #### 백엔드 실행
 ```bash
 cd structure_vis/backend
 pip install -r requirements.txt
-python main.py
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 #### 프론트엔드 실행
 ```bash
 cd structure_vis/frontend
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run structure_vis.py
+```
+
+#### 스캐폴드 사용
+```bash
+cd structure_vis
+python scafold.py backend  # 백엔드만 실행
+python scafold.py frontend # 프론트엔드만 실행
 ```
 
 ## 🌐 접속 정보
@@ -69,13 +70,13 @@ streamlit run app.py
 
 ## 📊 주요 기능
 
-### 데이터 증강
+### 데이터 증강 (Backend)
 - **노이즈 추가**: 수치형 데이터에 랜덤 노이즈 추가
 - **중복 생성**: 데이터 행 복제
 - **SMOTE**: 불균형 데이터 처리
 - **조합 증강**: 여러 방법을 조합한 증강
 
-### 데이터 시각화
+### 데이터 시각화 (Frontend)
 - **히스토그램 비교**: 원본 vs 증강 데이터 분포 비교
 - **박스플롯 비교**: 통계적 분포 비교
 - **산점도 비교**: 두 변수 간 관계 비교
@@ -92,83 +93,81 @@ streamlit run app.py
 - **FastAPI**: 고성능 웹 프레임워크
 - **Pandas**: 데이터 처리
 - **NumPy**: 수치 계산
-- **Plotly**: 시각화 생성
 - **Scikit-learn**: 머신러닝 (SMOTE 등)
 
 ### 프론트엔드
 - **Streamlit**: 웹 애플리케이션 프레임워크
 - **Plotly**: 인터랙티브 차트
 - **Requests**: HTTP 클라이언트
+- **Pandas**: 데이터 처리
 
 ## 📋 API 엔드포인트
 
-### 시각화 API (`/visualization`)
-- `POST /upload-data`: 데이터 파일 업로드
-- `POST /get-column-types`: 컬럼 타입 분석
-- `POST /create-histogram-comparison`: 히스토그램 비교
-- `POST /create-boxplot-comparison`: 박스플롯 비교
-- `POST /create-scatter-comparison`: 산점도 비교
-- `POST /create-categorical-chart`: 범주형 차트
-- `POST /create-comparison-dashboard`: 비교 대시보드
+### 세션 기반 API (`/api`)
+- `POST /data/upload`: 파일 업로드 및 세션 생성
+- `GET /data/analyze/{session_id}`: 세션 데이터 분석
+- `GET /data/preview/{session_id}`: 데이터 미리보기
+- `POST /augmentation/process`: 데이터 증강 처리
+- `GET /data/download/{session_id}`: 증강된 데이터 다운로드
 
-### 데이터 증강 API (`/augmentation`)
-- `GET /methods`: 사용 가능한 증강 방법
-- `POST /validate-params`: 파라미터 검증
-- `POST /preview`: 증강 결과 미리보기
-- `POST /augment`: 데이터 증강 실행
-- `POST /batch-augment`: 배치 증강
+### 기존 API (`/augmentation`)
+- 기존 엔드포인트들도 유지하여 호환성 보장
 
 ## 💡 사용 예시
 
-### 1. 데이터 업로드
-웹 인터페이스에서 CSV 파일을 업로드하거나, API를 직접 호출할 수 있습니다.
-
-### 2. 데이터 증강
+### 1. 데이터 업로드 및 분석
 ```python
 import requests
 
+# 파일 업로드
+with open('data.csv', 'rb') as f:
+    files = {'file': f}
+    response = requests.post('http://localhost:8000/api/data/upload', files=files)
+    session_id = response.json()['session_id']
+
+# 데이터 분석
+analysis = requests.get(f'http://localhost:8000/api/data/analyze/{session_id}').json()
+```
+
+### 2. 데이터 증강
+```python
 # 증강 파라미터 설정
 params = {
+    "session_id": session_id,
+    "methods": ["noise", "duplicate"],
     "noise_level": 0.05,
     "augmentation_ratio": 0.5,
     "dup_count": 2
 }
 
 # 데이터 증강 실행
-response = requests.post(
-    "http://localhost:8000/augmentation/augment",
-    json={
-        "data": your_data,
-        "method": "조합 증강",
-        "parameters": params
-    }
-)
+response = requests.post('http://localhost:8000/api/augmentation/process', json=params)
 ```
 
-### 3. 시각화 생성
+### 3. 시각화 (Frontend에서 처리)
 ```python
-# 히스토그램 비교 차트 생성
-response = requests.post(
-    "http://localhost:8000/visualization/create-histogram-comparison",
-    json={
-        "original_data": original_data,
-        "augmented_data": augmented_data,
-        "column": "feature_name"
-    }
-)
+# Streamlit 앱에서 자동으로 처리됨
+# 별도 API 호출 불필요
 ```
 
 ## 🔍 아키텍처
 
 ### 계층 구조
-1. **API Layer**: HTTP 엔드포인트 제공
-2. **Service Layer**: 비즈니스 로직 처리
-3. **Library Layer**: 핵심 기능 구현
+1. **API Layer**: HTTP 엔드포인트 제공 (Backend)
+2. **Service Layer**: 비즈니스 로직 처리 (Backend)
+3. **Library Layer**: 핵심 기능 구현 (독립적인 backend/lib)
+4. **Visualization Layer**: 시각화 처리 (Frontend)
 
 ### 데이터 흐름
 ```
 Frontend (Streamlit) → Backend API → Service Layer → Library Layer
+                    ↓
+              Visualization (Local)
 ```
+
+### 역할 분담
+- **Backend**: 데이터 증강, 세션 관리, API 제공
+- **Frontend**: 시각화, 사용자 인터페이스, 데이터 표시
 
 ## 🛠️ 개발 환경 설정
 
@@ -186,6 +185,21 @@ pip install -r requirements.txt
 cd structure_vis/frontend
 pip install -r requirements.txt
 ```
+
+## 🔄 리팩토링 내용
+
+### 주요 개선사항
+1. **역할 분리**: Backend(증강) + Frontend(시각화)
+2. **독립성 확보**: structure_vis 프로젝트 독립 관리
+3. **코드 정리**: 사용하지 않는 파일 삭제
+4. **의존성 최적화**: 독립적인 라이브러리 구조
+5. **성능 개선**: 시각화를 로컬에서 처리하여 네트워크 오버헤드 감소
+
+### 변경된 구조
+- `frontend/app.py` 삭제 → `structure_vis.py` 단일 파일 사용
+- `backend/lib/` 독립적인 라이브러리로 재구성
+- `backend/visualization_api.py` 삭제 → `frontend/src/visualization.py`로 이동
+- 세션 기반 API 추가로 대용량 데이터 처리 개선
 
 ## 🐛 문제 해결
 

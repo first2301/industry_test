@@ -90,3 +90,8 @@ data
 # 가상환경
 .test_venv
 catboost_info/
+
+data
+venv
+.venv
+.augmentation

@@ -27,6 +27,66 @@ import plotly.express as px
 from lib.research_prepro_engine import ResearchBasedRecommendationEngine
 from lib.visualization_engine import VisualizationRecommendationEngine
 
+def read_data_file(uploaded_file):
+    """CSV와 Excel 파일을 모두 지원하는 파일 읽기 함수"""
+    file_name = uploaded_file.name.lower()
+    
+    try:
+        if file_name.endswith(('.xlsx', '.xls')):
+            # Excel 파일 읽기 - 컬럼명 보존 옵션 추가
+            df = pd.read_excel(
+                uploaded_file,
+                engine='openpyxl',  # 명시적으로 엔진 지정
+                header=0,           # 첫 번째 행을 헤더로 사용
+                keep_default_na=True,  # 기본 NA 값 처리
+                na_values=['', 'NULL', 'null', 'N/A', 'n/a']  # 추가 NA 값들
+            )
+            
+            # 컬럼명 정리 (공백 제거, 특수문자 처리)
+            df.columns = df.columns.astype(str).str.strip()
+            
+            # st.success(f"Excel 파일 '{uploaded_file.name}'을 성공적으로 읽었습니다.")
+            st.info(f"컬럼 수: {len(df.columns)}, 행 수: {len(df)}")
+            
+            return df
+            
+        elif file_name.endswith('.csv'):
+            # CSV 파일 읽기 - 여러 인코딩 시도
+            encodings = ['utf-8', 'cp949', 'euc-kr', 'iso-8859-1', 'latin-1']
+            
+            for encoding in encodings:
+                try:
+                    uploaded_file.seek(0)
+                    df = pd.read_csv(
+                        uploaded_file, 
+                        encoding=encoding,
+                        header=0,
+                        keep_default_na=True
+                    )
+                    
+                    # 컬럼명 정리
+                    df.columns = df.columns.astype(str).str.strip()
+                    
+                    # st.success(f"CSV 파일 '{uploaded_file.name}'을 {encoding} 인코딩으로 성공적으로 읽었습니다.")
+                    # st.info(f"컬럼 수: {len(df.columns)}, 행 수: {len(df)}")
+                    
+                    return df
+                except UnicodeDecodeError:
+                    continue
+                except Exception as e:
+                    continue
+            
+            st.error(f"CSV 파일 '{uploaded_file.name}'을 읽을 수 없습니다.")
+            return None
+            
+        else:
+            st.error(f"지원하지 않는 파일 형식입니다: {uploaded_file.name}")
+            return None
+            
+    except Exception as e:
+        st.error(f"파일 읽기 중 오류가 발생했습니다: {str(e)}")
+        return None
+
 # import matplotlib.pyplot as plt
 # import seaborn as sns
 
@@ -44,9 +104,13 @@ uploaded_file = None
 df = None
 
 if connecton_option == 'File_upload':
-    uploaded_file = st.sidebar.file_uploader("csv file upload", type="csv") # 파일 업로드
+    uploaded_file = st.sidebar.file_uploader(
+        "데이터 파일 업로드", 
+        type=["csv", "xlsx", "xls"]
+    )
+    
     if uploaded_file:
-        df = pd.read_csv(uploaded_file)
+        df = read_data_file(uploaded_file)
 
 with st.spinner('Wait for it...'):
     updated_df = None
@@ -63,7 +127,7 @@ with st.spinner('Wait for it...'):
         data_to_drop = st.sidebar.multiselect('Drop Cloumns', options=col_list)
         data_for_labelencoding = st.sidebar.multiselect('Choose LabelEncoding column name', options=col_list)
         
-        tab_eda_df, tab_eda_info, tab_Label_counts = st.tabs(['Original data', 'Null information', 'Target Data Counts']) # tab_Label_counts Labels counts
+        tab_eda_df, tab_eda_info, tab_Label_counts = st.tabs(['Original data', 'Data information', 'Target Data Counts']) # tab_Label_counts Labels counts
         # tab_eda_df, tab_eda_info tab UI Template
         template.eda_df(tab_eda_df=tab_eda_df, tab_eda_info=tab_eda_info)
         label_to_drop = ""
@@ -85,8 +149,13 @@ with st.spinner('Wait for it...'):
 
        
         if data_to_drop:
-            for data in data_to_drop:
-                updated_df = df.drop(data_to_drop, axis=1)
+            # 타겟 컬럼이 제거 대상에 포함되어 있는지 확인
+            if target_feture and any(target in data_to_drop for target in target_feture):
+                st.error(f"타겟 컬럼 '{target_feture}'은 제거할 수 없습니다. 타겟 컬럼을 다시 선택하거나 제거 대상을 수정해주세요.")
+                st.stop()
+            
+            # 제거할 컬럼들을 한 번에 제거
+            updated_df = df.drop(data_to_drop, axis=1)
 
      
         try:
@@ -102,12 +171,12 @@ with st.spinner('Wait for it...'):
             st.subheader('데이터 전처리')
             st.dataframe(updated_df, use_container_width=True)
         
-        if st.sidebar.button("초기화"):
+        if st.sidebar.button("초기화", use_container_width=True):
             st.cache_resource.clear()
 
 
 #################### Starting ML traning
-        button_for_training = st.sidebar.button("머신러닝 테스트 실행", key="button1") 
+        button_for_training = st.sidebar.button("머신러닝 테스트 실행", key="button1", use_container_width=True) 
         if button_for_training: # 분류, 이상탐지 옵션에 따라 머신러닝 학습 진행
             start_time = time.time()
             # start_time = time.time() # 학습 시간 체크 시 설정
@@ -218,9 +287,22 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # f1_weighted 기준으로 정렬 (없으면 accuracy)
+                                    # 기존 코드 주석처리
+                                    # sorted_df = sorted_df.sort_values(by='f1_weighted', ascending=False)
+                                    
+                                    # 다중 정렬 기준 적용
+                                    # 정렬 우선순위: f1_weighted → accuracy → precision → recall
+                                    # 동일한 점수일 때 다음 지표로 순차 정렬
                                     if 'f1_weighted' in sorted_df.columns:
-                                        sorted_df = sorted_df.sort_values(by='f1_weighted', ascending=False)
+                                        sort_columns = ['f1_weighted']
+                                        if 'accuracy' in sorted_df.columns:
+                                            sort_columns.append('accuracy')
+                                        if 'precision' in sorted_df.columns:
+                                            sort_columns.append('precision')
+                                        if 'recall' in sorted_df.columns:
+                                            sort_columns.append('recall')
+                                        
+                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=False)
                                     elif 'accuracy' in sorted_df.columns:
                                         sorted_df = sorted_df.sort_values(by='accuracy', ascending=False)
                                     else:
@@ -258,9 +340,18 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # neg_mean_squared_error 기준으로 정렬 (음수값이므로 내림차순)
+                                    # 기존 코드 주석처리
+                                    # sorted_df = sorted_df.sort_values(by='neg_mean_squared_error', ascending=False)
+                                    
+                                    # 다중 정렬 기준 적용
+                                    # 정렬 우선순위: neg_mean_squared_error → neg_mean_absolute_error
+                                    # 동일한 점수일 때 다음 지표로 순차 정렬
                                     if 'neg_mean_squared_error' in sorted_df.columns:
-                                        sorted_df = sorted_df.sort_values(by='neg_mean_squared_error', ascending=False)
+                                        sort_columns = ['neg_mean_squared_error']
+                                        if 'neg_mean_absolute_error' in sorted_df.columns:
+                                            sort_columns.append('neg_mean_absolute_error')
+                                        
+                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=False)
                                     else:
                                         sorted_df = sorted_df.sort_values(by=sorted_df.columns[0], ascending=False)
                                 else:
@@ -296,9 +387,23 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # silhouette 기준으로 정렬 (높을수록 좋음)
+                                    # 기존 코드 주석처리
+                                    # sorted_df = sorted_df.sort_values(by='silhouette', ascending=False)
+                                    
+                                    # 다중 정렬 기준 적용
+                                    # 정렬 우선순위: silhouette → calinski_harabasz → davies_bouldin
+                                    # 동일한 점수일 때 다음 지표로 순차 정렬
+                                    # 주의: davies_bouldin은 낮을수록 좋음 (ascending=True)
                                     if 'silhouette' in sorted_df.columns:
-                                        sorted_df = sorted_df.sort_values(by='silhouette', ascending=False)
+                                        sort_columns = ['silhouette']
+                                        if 'calinski_harabasz' in sorted_df.columns:
+                                            sort_columns.append('calinski_harabasz')
+                                        if 'davies_bouldin' in sorted_df.columns:
+                                            sort_columns.append('davies_bouldin')
+                                        
+                                        # davies_bouldin은 낮을수록 좋으므로 ascending=True
+                                        ascending_values = [False] * (len(sort_columns) - 1) + [True]
+                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=ascending_values)
                                     elif 'calinski_harabasz' in sorted_df.columns:
                                         sorted_df = sorted_df.sort_values(by='calinski_harabasz', ascending=False)
                                     elif 'davies_bouldin' in sorted_df.columns:
@@ -352,30 +457,30 @@ with st.spinner('Wait for it...'):
                             st.plotly_chart(fig, use_container_width=True)
                             
                             # 평가지표 설명 추가
-                            if option == '분류':
-                                st.subheader('📊 분류 모델 성능 평가')
-                                st.info("""
-                                **평가지표 설명:**
-                                - **accuracy**: 정확도 (높을수록 좋음)
-                                - **recall**: 재현율 (높을수록 좋음)
-                                - **precision**: 정밀도 (높을수록 좋음)  
-                                - **f1_weighted**: 가중 F1 스코어 (높을수록 좋음)
-                                """)
-                            elif option == '회귀':
-                                st.subheader('📊 회귀 모델 성능 평가')
-                                st.info("""
-                                **평가지표 설명:**
-                                - **neg_mean_squared_error**: 음의 평균 제곱 오차 (0에 가까울수록 좋음)
-                                - **neg_mean_absolute_error**: 음의 평균 절대 오차 (0에 가까울수록 좋음)
-                                """)
-                            elif option == '군집':
-                                st.subheader('📊 군집 모델 성능 평가')
-                                st.info("""
-                                **평가지표 설명:**
-                                - **silhouette**: 실루엣 스코어 (높을수록 좋음, -1~1)
-                                - **calinski_harabasz**: 칼린스키-하라바즈 지수 (높을수록 좋음)
-                                - **davies_bouldin**: 데이비스-볼딘 지수 (낮을수록 좋음)
-                                """)
+                            # if option == '분류':
+                            #     st.subheader('📊 분류 모델 성능 평가')
+                            #     st.info("""
+                            #     **평가지표 설명:**
+                            #     - **accuracy**: 정확도 (높을수록 좋음)
+                            #     - **recall**: 재현율 (높을수록 좋음)
+                            #     - **precision**: 정밀도 (높을수록 좋음)  
+                            #     - **f1_weighted**: F1 스코어 (높을수록 좋음)
+                            #     """)
+                            # elif option == '회귀':
+                            #     st.subheader('📊 회귀 모델 성능 평가')
+                            #     st.info("""
+                            #     **평가지표 설명:**
+                            #     - **neg_mean_squared_error**: 음의 평균 제곱 오차 (0에 가까울수록 좋음)
+                            #     - **neg_mean_absolute_error**: 음의 평균 절대 오차 (0에 가까울수록 좋음)
+                            #     """)
+                            # elif option == '군집':
+                            #     st.subheader('📊 군집 모델 성능 평가')
+                            #     st.info("""
+                            #     **평가지표 설명:**
+                            #     - **silhouette**: 실루엣 스코어 (높을수록 좋음, -1~1)
+                            #     - **calinski_harabasz**: 칼린스키-하라바즈 지수 (높을수록 좋음)
+                            #     - **davies_bouldin**: 데이비스-볼딘 지수 (낮을수록 좋음)
+                            #     """)
                             
                             st.subheader('🎯 모델 비교')
                             
@@ -508,7 +613,7 @@ with st.spinner('Wait for it...'):
                             st.dataframe(vis_recommendations_df, use_container_width=True)
                             
                             # 시각화 추천 상세 설명
-                            st.subheader("📊 시각화 추천 상세 설명")
+                            # st.subheader("📊 시각화 추천 상세 설명")
                             # st.info("""
                             # **시각화 유형별 설명:**
                             

@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib import ImageAugmenter, DataUtils
 
 st.set_page_config(layout='wide')
-st.title("🖼️ 이미지 데이터 증강 및 시각화 도구")
+st.title("🖼️ 이미지 데이터 전처리 및 시각화 도구")
 
 # 클래스 인스턴스 생성
 image_augmenter = ImageAugmenter()
@@ -49,13 +49,13 @@ if uploaded_files:
         image_augmenter.display_images_grid(original_images, original_captions)
 
         st.markdown("---")
-        st.subheader("증강 옵션 설정")
+        st.subheader("전처리 옵션 설정")
         
         # 증강 파라미터 입력받기
         params = image_augmenter.get_augmentation_parameters()
 
         st.markdown("---")
-        st.subheader("증강된 이미지 미리보기")
+        st.subheader("전처리된 이미지 미리보기")
         
         # 이미지 증강 수행
         augmented_images = []
@@ -74,13 +74,13 @@ if uploaded_files:
 
             # 증강 전후 비교 섹션 추가
             st.markdown("---")
-            st.subheader("📊 증강 전후 비교")
+            st.subheader("📊 전처리 전후 비교")
             
             # 이미지 개수 및 크기 비교
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**📷 원본 이미지 정보**")
+                st.markdown("**📷 전처리 전 이미지 정보**")
                 st.write(f"이미지 개수: {len(original_images)}")
                 if original_images:
                     first_img = original_images[0]
@@ -88,7 +88,7 @@ if uploaded_files:
                     st.write(f"이미지 모드: {first_img.mode}")
             
             with col2:
-                st.markdown("**📷 증강 이미지 정보**")
+                st.markdown("**📷 전처리 후 이미지 정보**")
                 st.write(f"이미지 개수: {len(augmented_images)}")
                 if augmented_images:
                     first_aug_img = augmented_images[0]
@@ -96,7 +96,7 @@ if uploaded_files:
                     st.write(f"이미지 모드: {first_aug_img.mode}")
             
             # 증강 효과 시각화
-            st.markdown("**📊 증강 전후 히스토그램 비교**")
+            st.markdown("**📊 전처리 전후 히스토그램 비교**")
             selected_img_idx = st.selectbox("비교할 이미지 선택", range(len(original_images)), format_func=lambda x: f"이미지 {x+1}")
             
             if selected_img_idx < len(original_images) and selected_img_idx < len(augmented_images):
@@ -108,12 +108,12 @@ if uploaded_files:
                     st.plotly_chart(fig_orig, use_container_width=True, key="img_orig_hist")
                 
                 with col2:
-                    st.markdown("**증강 이미지 히스토그램**")
+                    st.markdown("**전처리 후 이미지 히스토그램**")
                     fig_aug = image_augmenter.create_histogram(augmented_images[selected_img_idx])
                     st.plotly_chart(fig_aug, use_container_width=True, key="img_aug_hist")
                 
                 # 증강 효과 요약
-                st.markdown("**📋 증강 효과 요약**")
+                st.markdown("**📋 전처리 효과 요약**")
                 summary_col1, summary_col2, summary_col3 = st.columns(3)
                 
                 with summary_col1:
@@ -132,14 +132,14 @@ if uploaded_files:
                         st.metric("밝기 조절", "변경 없음")
 
             st.markdown("---")
-            st.subheader("증강 이미지 다운로드")
+            st.subheader("전처리 이미지 다운로드")
             
             # 다운로드 버튼 생성
             for idx, (img, file) in enumerate(zip(augmented_images, uploaded_files[:len(augmented_images)])):
                 try:
                     img_bytes = image_augmenter.prepare_download(img)
                     st.download_button(
-                        label=f"{file.name} 증강본 다운로드",
+                        label=f"{file.name} 전처리본 다운로드",
                         data=img_bytes,
                         file_name=f"aug_{file.name}",
                         mime="image/png"
@@ -147,8 +147,8 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"다운로드 준비 실패: {file.name} - {str(e)}")
         else:
-            st.error("❌ 증강된 이미지가 없습니다.")
-            st.info("💡 증강 과정에서 오류가 발생했습니다. 다른 증강 옵션을 시도해보세요.")
+            st.error("❌ 전처리된 이미지가 없습니다.")
+            st.info("💡 전처리 과정에서 오류가 발생했습니다. 다른 전처리 옵션을 시도해보세요.")
 else:
     st.info("👈 왼쪽 사이드바에서 이미지 파일을 업로드하세요!")
     with st.expander("📋 지원되는 이미지 형식"):

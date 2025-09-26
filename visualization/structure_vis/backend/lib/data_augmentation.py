@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 from imblearn.over_sampling import SMOTE, RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-import streamlit as st
 
 
 class DataAugmenter:
@@ -40,8 +39,7 @@ class DataAugmenter:
             pd.DataFrame: 증강된 데이터프레임
         """
         if method not in self.supported_methods:
-            st.error(f"지원하지 않는 증강 방법입니다: {method}")
-            return df
+            raise ValueError(f"지원하지 않는 증강 방법입니다: {method}")
             
         return self.supported_methods[method](df, **kwargs)
     
@@ -87,13 +85,7 @@ class DataAugmenter:
                 max(unique_values) < unique_count  # 최대값이 고유값 개수보다 작음
             )
             
-            if is_binary:
-                pass  # 메시지 제거
-            elif is_categorical:
-                pass  # 메시지 제거
-            elif unique_count <= 20:
-                pass  # 메시지 제거
-            else:
+            if not (is_binary or is_categorical or unique_count <= 20):
                 return df
         
         X = df.drop(columns=[target_col])
@@ -117,10 +109,6 @@ class DataAugmenter:
                 k_neighbors = min(3, min_samples - 1)  # 최소 1개는 남겨야 함
                 if k_neighbors < 1:
                     k_neighbors = 1
-                
-                # 클래스별 샘플 수가 너무 적은 경우 조정 (메시지 제거)
-                if min_samples < 5:
-                    pass
                 
                 # SMOTE 적용 시 동적 설정 사용
                 sm = SMOTE(random_state=42, k_neighbors=k_neighbors, sampling_strategy='auto')
@@ -289,9 +277,7 @@ class DataAugmenter:
             except Exception as e:
                 continue
         
-        if applied_methods:
-            pass
-        else:
+        if not applied_methods:
             result_df = df.copy()
         
         return result_df
@@ -340,4 +326,4 @@ class DataAugmenter:
             'feature': '특성 기반 증강 (데이터 분포 분석 기반 증강)',
             'smote': 'SMOTE (불균형 데이터 증강)',
             'general': '일반 증강 (랜덤 샘플링 + 노이즈)'
-        }
+        } 
