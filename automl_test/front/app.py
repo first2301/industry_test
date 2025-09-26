@@ -287,22 +287,9 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # 기존 코드 주석처리
-                                    # sorted_df = sorted_df.sort_values(by='f1_weighted', ascending=False)
-                                    
-                                    # 다중 정렬 기준 적용
-                                    # 정렬 우선순위: f1_weighted → accuracy → precision → recall
-                                    # 동일한 점수일 때 다음 지표로 순차 정렬
+                                    # f1_weighted 기준으로 정렬 (없으면 accuracy)
                                     if 'f1_weighted' in sorted_df.columns:
-                                        sort_columns = ['f1_weighted']
-                                        if 'accuracy' in sorted_df.columns:
-                                            sort_columns.append('accuracy')
-                                        if 'precision' in sorted_df.columns:
-                                            sort_columns.append('precision')
-                                        if 'recall' in sorted_df.columns:
-                                            sort_columns.append('recall')
-                                        
-                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=False)
+                                        sorted_df = sorted_df.sort_values(by='f1_weighted', ascending=False)
                                     elif 'accuracy' in sorted_df.columns:
                                         sorted_df = sorted_df.sort_values(by='accuracy', ascending=False)
                                     else:
@@ -340,18 +327,9 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # 기존 코드 주석처리
-                                    # sorted_df = sorted_df.sort_values(by='neg_mean_squared_error', ascending=False)
-                                    
-                                    # 다중 정렬 기준 적용
-                                    # 정렬 우선순위: neg_mean_squared_error → neg_mean_absolute_error
-                                    # 동일한 점수일 때 다음 지표로 순차 정렬
+                                    # neg_mean_squared_error 기준으로 정렬 (음수값이므로 내림차순)
                                     if 'neg_mean_squared_error' in sorted_df.columns:
-                                        sort_columns = ['neg_mean_squared_error']
-                                        if 'neg_mean_absolute_error' in sorted_df.columns:
-                                            sort_columns.append('neg_mean_absolute_error')
-                                        
-                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=False)
+                                        sorted_df = sorted_df.sort_values(by='neg_mean_squared_error', ascending=False)
                                     else:
                                         sorted_df = sorted_df.sort_values(by=sorted_df.columns[0], ascending=False)
                                 else:
@@ -387,23 +365,9 @@ with st.spinner('Wait for it...'):
                                 # DataFrame 생성 및 정렬
                                 if integrated_data:
                                     sorted_df = pd.DataFrame(integrated_data).set_index('Model')
-                                    # 기존 코드 주석처리
-                                    # sorted_df = sorted_df.sort_values(by='silhouette', ascending=False)
-                                    
-                                    # 다중 정렬 기준 적용
-                                    # 정렬 우선순위: silhouette → calinski_harabasz → davies_bouldin
-                                    # 동일한 점수일 때 다음 지표로 순차 정렬
-                                    # 주의: davies_bouldin은 낮을수록 좋음 (ascending=True)
+                                    # silhouette 기준으로 정렬 (높을수록 좋음)
                                     if 'silhouette' in sorted_df.columns:
-                                        sort_columns = ['silhouette']
-                                        if 'calinski_harabasz' in sorted_df.columns:
-                                            sort_columns.append('calinski_harabasz')
-                                        if 'davies_bouldin' in sorted_df.columns:
-                                            sort_columns.append('davies_bouldin')
-                                        
-                                        # davies_bouldin은 낮을수록 좋으므로 ascending=True
-                                        ascending_values = [False] * (len(sort_columns) - 1) + [True]
-                                        sorted_df = sorted_df.sort_values(by=sort_columns, ascending=ascending_values)
+                                        sorted_df = sorted_df.sort_values(by='silhouette', ascending=False)
                                     elif 'calinski_harabasz' in sorted_df.columns:
                                         sorted_df = sorted_df.sort_values(by='calinski_harabasz', ascending=False)
                                     elif 'davies_bouldin' in sorted_df.columns:
