@@ -50,8 +50,8 @@ class ImageAugmenter:
             augmented_img = self._adjust_brightness(augmented_img, kwargs['brightness'])
         
         # 노이즈 추가
-        if 'noise' in kwargs and kwargs['noise']:
-            augmented_img = self._add_noise(augmented_img)
+        if 'noise_intensity' in kwargs and kwargs['noise_intensity'] != 15:
+            augmented_img = self._add_noise(augmented_img, kwargs.get('noise_intensity', 15))
         
         # 대비 조절
         if 'contrast' in kwargs and kwargs['contrast'] != 1.0:
@@ -144,31 +144,33 @@ class ImageAugmenter:
         st_cols = st.columns(min(cols, len(images)))
         for idx, (img, caption) in enumerate(zip(images, captions)):
             with st_cols[idx % len(st_cols)]:
-                st.image(img, caption=caption, use_column_width=True)
+                st.image(img, caption=caption, use_container_width=True)
     
     def get_augmentation_parameters(self) -> dict:
         """증강 파라미터들을 UI에서 입력받습니다."""
-        col1, col2, col3, col4 = st.columns(4)
+        # col1, col2, col3, col4 = st.columns(4)
         
         params = {}
         
-        with col1:
-            params['rotation'] = st.slider("회전 각도", -45, 45, 0, step=1)
+        # with col1:
+        params['rotation'] = st.sidebar.slider("회전 각도", -45, 45, 0, step=1)
             
-        with col2:
-            params['flip'] = st.checkbox("좌우 반전", value=False)
+        # with col2:
+        params['flip'] = st.sidebar.checkbox("좌우 반전", value=False)
             
-        with col3:
-            params['brightness'] = st.slider("밝기 조절", 0.5, 2.0, 1.0, step=0.05)
+        # with col3:
+        params['brightness'] = st.sidebar.slider("밝기 조절", 0.5, 2.0, 1.0, step=0.05)
             
-        with col4:
-            params['noise'] = st.checkbox("노이즈 추가", value=False)
+        # with col4:
+        # params['noise'] = st.sidebar.checkbox("노이즈 추가", value=False)
+        params['noise_intensity'] = st.sidebar.slider("노이즈 강도", 1, 30, 15)
+        # params['noise_intensity'] = st.sidebar.slider("노이즈 강도", 1, 30, 15, disabled=not params['noise'])
         
         # 추가 파라미터들
-        col5, col6 = st.columns(2)
-        with col5:
-            params['contrast'] = st.slider("대비 조절", 0.5, 2.0, 1.0, step=0.05)
-        with col6:
-            params['hue'] = st.slider("색조 조절", 0.5, 2.0, 1.0, step=0.05)
+        # col5, col6 = st.columns(2)
+        # with col5:
+        params['contrast'] = st.sidebar.slider("대비 조절", 0.5, 2.0, 1.0, step=0.05)
+        # with col6:
+        params['hue'] = st.sidebar.slider("색조 조절", 0.5, 2.0, 1.0, step=0.05)
         
         return params 
