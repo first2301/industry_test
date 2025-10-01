@@ -49,7 +49,6 @@ def main():
         
         # 배치 크기 설정
         batch_size = config['processing_ranges']['batch_size']
-        logging.info(f"배치 크기: {batch_size}")
             
         # 데이터 처리 파이프라인 실행 (배치 처리)
         logging.info("배치 데이터 처리 파이프라인 시작...")

@@ -11,7 +11,7 @@ class Config:
     
     # 기본 설정
     DEFAULT_CONFIG = {
-        'data_dir': r'G:\industry_data',  # raw string 사용으로 백슬래시 이스케이프 방지
+        'data_dir': r'/mnt/external_drive/industry_data',  # raw string 사용으로 백슬래시 이스케이프 방지
         'max_workers': 4,
         'log_level': logging.INFO,
         'log_file': './log/prepro.log',

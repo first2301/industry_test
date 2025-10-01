@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import signal
 import functools
+import uuid
 
 
 def timeout_handler(signum, frame):
@@ -59,6 +60,37 @@ def timeout(seconds):
                 return result
         return wrapper
     return decorator
+
+
+class UUIDProcessor:
+    """UUID 및 파일 메타데이터 처리 클래스"""
+    
+    @staticmethod
+    def generate_uuid() -> str:
+        """UUID 생성"""
+        return str(uuid.uuid4())
+    
+    @staticmethod
+    def convert_file_size(size_bytes: int) -> str:
+        """파일 크기를 읽기 쉬운 형태로 변환"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+    
+    @staticmethod
+    def extract_data_category(full_path: str) -> str:
+        """경로에서 데이터 카테고리 추출"""
+        if 'cctv_data' in full_path:
+            return 'cctv_data'
+        elif 'sand_data' in full_path:
+            return 'sand_data'
+        else:
+            return 'other'
 
 
 class DataProcessor:
@@ -192,9 +224,18 @@ class DataProcessor:
             return (0, 0)
     
     @staticmethod
+    def filter_non_zip_files(file_paths: List[Path]) -> List[Path]:
+        """ZIP 파일을 제외하고 실제 데이터 파일만 필터링"""
+        filtered_paths = []
+        for path in file_paths:
+            if path.suffix.lower() != '.zip':
+                filtered_paths.append(path)
+        return filtered_paths
+    
+    @staticmethod
     def extract_file_metadata(file_paths: List[Path], max_workers: int = 4, 
                              batch_num: int = 0, total_batches: int = 0) -> List[Dict[str, Any]]:
-        """파일 메타데이터 추출 - 기본 정보 (배치 처리 최적화)"""
+        """파일 메타데이터 추출 - 기본 정보 + UUID + 파생 컬럼 (배치 처리 최적화)"""
         metadata_list = []
         total_files = len(file_paths)
         
@@ -204,10 +245,14 @@ class DataProcessor:
                 # 기본 정보 추출
                 metadata = {
                     'full_path': str(path),
-                    'file_id': path.stem,
+                    'file_id': UUIDProcessor.generate_uuid(),  # file_id 대신 uuid 사용
                     'folder_name': path.parent.name,
                     'file_size': path.stat().st_size if path.exists() else 0,
+                    'file_size_readable': UUIDProcessor.convert_file_size(
+                        path.stat().st_size if path.exists() else 0
+                    ),
                     'file_type': path.suffix.lower(),
+                    'data_category': UUIDProcessor.extract_data_category(str(path))
                 }
                 
                 metadata_list.append(metadata)
@@ -216,9 +261,12 @@ class DataProcessor:
                 # 실패한 경우에도 기본 정보는 포함
                 metadata = {
                     'full_path': str(path),
-                    'file_id': path.stem,
+                    'uuid': UUIDProcessor.generate_uuid(),
                     'folder_name': path.parent.name,
                     'file_size': 0,
+                    'file_size_readable': '0 B',
+                    'file_type': path.suffix.lower(),
+                    'data_category': 'unknown'
                 }
                 metadata_list.append(metadata)
         
@@ -258,7 +306,8 @@ class DataProcessor:
         df = pl.DataFrame(metadata_list)
         
         # 컬럼 순서 정리
-        df = df.select(['full_path', 'file_id', 'folder_name', 'file_size', 'image_width', 'image_height'])
+        df = df.select(['full_path', 'uuid', 'folder_name', 'file_size', 
+                       'file_size_readable', 'file_type', 'data_category'])
         
         logging.info(f"DataFrame 생성 완료: {len(df)} 행, {len(df.columns)} 열")
         return df
@@ -283,20 +332,20 @@ class DataProcessor:
             # G 드라이브 정보 추가
             g_drive_info = ""
             try:
-                g_disk_usage = psutil.disk_usage('G:\\')
+                g_disk_usage = psutil.disk_usage('/mnt/external_drive/industry_data')
                 g_drive_info = f"""
-            G 드라이브 정보:
+            드라이브 정보:
             --------------------------------------
-            G 드라이브 전체 용량: {DataProcessor.format_bytes(g_disk_usage.total)} 
-            G 드라이브 사용된 용량: {DataProcessor.format_bytes(g_disk_usage.used)} 
-            G 드라이브 사용 퍼센트: {g_disk_usage.percent}%
-            G 드라이브 여유 용량: {DataProcessor.format_bytes(g_disk_usage.free)}
+            드라이브 전체 용량: {DataProcessor.format_bytes(g_disk_usage.total)} 
+            드라이브 사용된 용량: {DataProcessor.format_bytes(g_disk_usage.used)} 
+            드라이브 사용 퍼센트: {g_disk_usage.percent}%
+            드라이브 여유 용량: {DataProcessor.format_bytes(g_disk_usage.free)}
             --------------------------------------"""
             except Exception as e:
                 g_drive_info = f"""
-            G 드라이브 정보:
+            드라이브 정보:
             --------------------------------------
-            G 드라이브 접근 불가: {e}
+            드라이브 접근 불가: {e}
             --------------------------------------"""
             
             current_time = time.strftime('%Y-%m-%d %H:%M:%S') # 현재 시간 기록
@@ -352,11 +401,9 @@ class DataProcessor:
     @staticmethod
     def log_progress(message: str, level: int = logging.INFO, force_console: bool = False):
         """진행률 로깅 (콘솔 출력 제어)"""
-        if force_console:
-            # 강제로 콘솔에 출력 (flush=True로 즉시 출력)
-            print(f"[진행률] {message}", flush=True)
-        else:
-            logging.log(level, message)
+        # 로그 파일에 항상 저장
+        logging.log(level, f"{message}") # [진행률]
+
     
     @staticmethod
     def generate_file_info(pandas_df: pd.DataFrame) -> str:
@@ -430,7 +477,7 @@ class DataProcessor:
     @staticmethod
     def process_data_pipeline(data_path: str, output_db_path: str = './database/database.db', 
                             max_workers: int = 4, batch_size: int = 1000) -> Tuple[pd.DataFrame, str, str]:
-        """전체 데이터 처리 파이프라인 (배치 처리 지원, 로깅 최적화)"""
+        """메모리 효율적인 데이터 처리 파이프라인 (스트리밍 처리)"""
         pipeline_start_time = time.time()
         
         try:
@@ -439,104 +486,103 @@ class DataProcessor:
                 raise ValueError(f"유효하지 않은 데이터 경로: {data_path}")
             
             logging.info(f"데이터 처리 시작: {data_path}")
+    
             
-            # 데이터 로딩
-            all_path = Path(data_path).rglob('*')
-            file_only = [i for i in all_path if i.is_file()]
+            # 1. 제너레이터로 파일 경로 스트리밍
+            def file_path_stream():
+                """파일 경로를 스트리밍으로 제공"""
+                for path in Path(data_path).rglob('*'):
+                    if path.is_file(): # and path.suffix.lower() != '.zip':
+                        yield path
             
-            if not file_only:
-                logging.warning(f"처리할 파일이 없습니다: {data_path}")
-                return pd.DataFrame(), "처리할 파일이 없습니다", output_db_path
-            
-            logging.info(f"총 {len(file_only)}개 파일 발견")
+            # 2. 배치 제너레이터
+            def batch_generator(file_stream, batch_size):
+                """파일 스트림을 배치로 분할"""
+                batch = []
+                for path in file_stream:
+                    batch.append(path)
+                    if len(batch) >= batch_size:
+                        yield batch
+                        batch = []  # 배치 처리 후 즉시 해제
+                if batch:  # 마지막 남은 파일들
+                    yield batch
             
             # 배치 크기 결정 (메모리 사용량 고려)
             if batch_size <= 0:
                 batch_size = 1000  # 기본값
             
-            # 배치로 분할
-            batches = DataProcessor.split_file_list(file_only, batch_size)
-            total_batches = len(batches)
-            logging.info(f"총 {total_batches}개 배치로 분할 (배치 크기: {batch_size})")
+
+            # 전체 파일 수 및 배치 수 추정
+            estimated_total_files = 2745272  # 실제 파일 수
+            estimated_total_batches = (estimated_total_files + batch_size - 1) // batch_size
+            # logging.info(f"예상 총 배치 수: {estimated_total_batches}개, 예상 총 파일 수: {estimated_total_files:,}개")
             
-            # 진행률 로깅 간격 결정 (배치 수에 따라 적응적 조정)
-            if total_batches <= 100:
-                progress_interval = 1  # 100개 이하면 매 배치마다
-            elif total_batches <= 1000:
-                progress_interval = 5  # 1000개 이하면 5배치마다
-            elif total_batches <= 5000:
-                progress_interval = 25  # 5000개 이하면 25배치마다
-            else:
-                progress_interval = 50  # 5000개 이상이면 50배치마다
+            # 3. 배치별 즉시 처리 및 해제
+            batch_count = 0
+            total_files_processed = 0
+            total_size_processed = 0
+            last_logged_percentage_threshold = 0  # 10% 단위 로깅을 위한 임계값
             
-            # 진행률 로깅을 위한 변수
-            last_logged_batch = 0
+            file_stream = file_path_stream()
             
-            # 첫 번째 배치로 데이터베이스 초기화
-            if batches:
-                first_batch_df, first_batch_info = DataProcessor.process_batch(
-                    batches[0], 1, total_batches, max_workers
+            for batch_paths in batch_generator(file_stream, batch_size):
+                # 배치 처리 (올바른 배치 정보 전달)
+                batch_df, batch_info = DataProcessor.process_batch(
+                    batch_paths, batch_count + 1, estimated_total_batches, max_workers
                 )
-                DataProcessor.save_to_database(first_batch_df, output_db_path)
                 
-                # 첫 번째 배치 완료 로그
-                current_progress = (1 / total_batches) * 100
-                logging.info(f"첫 번째 배치 완료, 진행률 로그 호출 예정: {current_progress:.1f}%")
-                DataProcessor.log_progress(f"전체 진행률: {current_progress:.1f}% (1/{total_batches} 배치)", force_console=True)
-                last_logged_batch = 1
-                
-                # 나머지 배치들 처리
-                all_dfs = [first_batch_df]
-                batch_infos = [first_batch_info]
-                
-                # 전체 진행률 로깅 (적응적 간격)
-                for i, batch in enumerate(batches[1:], 2):
-                    batch_df, batch_info = DataProcessor.process_batch(
-                        batch, i, total_batches, max_workers
-                    )
+                # 즉시 데이터베이스 저장
+                if batch_count == 0:
+                    DataProcessor.save_to_database(batch_df, output_db_path)
+                else:
                     DataProcessor.append_to_database(batch_df, output_db_path)
-                    all_dfs.append(batch_df)
-                    batch_infos.append(batch_info)
+                
+                # 통계 업데이트
+                batch_count += 1
+                total_files_processed += len(batch_paths)
+                total_size_processed += sum(batch_df['file_size'])
+                
+                # 메모리 즉시 해제
+                del batch_df
+                del batch_paths
+                
+                # 진행률 계산
+                if estimated_total_files > 0:
+                    current_progress = (total_files_processed / estimated_total_files) * 100
+                else:
+                    current_progress = (batch_count / estimated_total_batches) * 100
+                
+                # 10% 단위 로깅
+                if current_progress >= last_logged_percentage_threshold + 10 or (current_progress >= 99.9 and last_logged_percentage_threshold < 100):
+                    DataProcessor.log_progress(
+                        f"전체 진행률: {current_progress:.1f}% ({total_files_processed:,}/{estimated_total_files:,} 파일)", 
+                        force_console=True
+                    )
                     
-                    # 진행률 로깅 (적응적 간격)
-                    if i >= last_logged_batch + progress_interval:
-                        current_progress = (i / total_batches) * 100
-                        logging.info(f"진행률 로그 호출: {current_progress:.1f}% ({i}/{total_batches})")
-                        DataProcessor.log_progress(f"전체 진행률: {current_progress:.1f}% ({i}/{total_batches} 배치)", force_console=True)
-                        last_logged_batch = i
-                
-                # 마지막 배치 완료 로그
-                if last_logged_batch < total_batches:
-                    final_progress = (total_batches / total_batches) * 100
-                    DataProcessor.log_progress(f"전체 진행률: {final_progress:.1f}% ({total_batches}/{total_batches} 배치)", force_console=True)
-                
-                # 전체 DataFrame 결합
-                pandas_df = pd.concat(all_dfs, ignore_index=True)
-                
-                # 전체 처리 시간 계산
-                pipeline_end_time = time.time()
-                # total_elapsed = pipeline_end_time - pipeline_start_time
-                
-                # 파일 정보 생성
-                file_info = DataProcessor.generate_file_info(pandas_df)
-                # file_info += f"\n전체 처리 시간: {total_elapsed:.1f}초"
-                
-                # 배치 처리 요약 정보만 표시
-                # total_files_processed = sum(len(batch) for batch in batches)
-                # total_size_processed = sum(pandas_df['file_size'])
-                # avg_batch_time = total_elapsed / total_batches
-                
-                # file_info += f"\n\n배치 처리 요약:"
-                # file_info += f"\n- 총 배치 수: {total_batches}개"
-                # file_info += f"\n- 총 파일 수: {total_files_processed:,}개"
-                # file_info += f"\n- 총 용량: {DataProcessor.format_bytes(total_size_processed)}"
-                # file_info += f"\n- 평균 배치 처리 시간: {avg_batch_time:.1f}초"
-                # file_info += f"\n- 처리 속도: {total_files_processed/total_elapsed:.0f} 파일/초"
-                
-                # logging.info(f"배치 데이터 처리 파이프라인 완료 (총 {total_elapsed:.1f}초)")
-                return pandas_df, file_info, output_db_path
-            else:
-                return pd.DataFrame(), "처리할 배치가 없습니다", output_db_path
+                    # 다음 임계값 업데이트
+                    if current_progress >= 100:
+                        last_logged_percentage_threshold = 100
+                    else:
+                        last_logged_percentage_threshold = int(current_progress) 
+            
+            # 전체 처리 시간 계산
+            pipeline_end_time = time.time()
+            total_elapsed = pipeline_end_time - pipeline_start_time
+  
+            # 파일 정보 생성
+            file_info = f"""
+            데이터 처리 정보:
+            --------------------------------------
+            전체 파일 수: {total_files_processed:,}
+            전체 파일 용량: {DataProcessor.format_bytes(total_size_processed)}
+            --------------------------------------
+            """
+            
+            logging.info(f"데이터 처리 파이프라인 완료 (총 {total_elapsed:.1f}초)")
+            logging.info(f"총 {total_files_processed:,}개 파일 처리 완료")
+            
+            # 빈 DataFrame 반환 (메모리 절약)
+            return pd.DataFrame(), file_info, output_db_path
             
         except Exception as e:
             logging.error(f"데이터 처리 파이프라인 실패: {e}")
