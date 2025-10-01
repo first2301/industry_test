@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from scipy import stats as scipy_stats
-import time
 
 st.set_page_config(layout='wide')
 
@@ -17,75 +15,6 @@ if uploaded_file is not None:
     st.title("데이터 분포 분석 및 시각화")
     st.dataframe(data, use_container_width=True, height=300)    
     st.markdown("---")
-
-    # 데이터 분석 및 인사이트 생성 함수들
-    def analyze_data_quality(df):
-        """데이터 품질 분석"""
-        missing_ratio = df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100
-        duplicate_ratio = df.duplicated().sum() / len(df) * 100
-        
-        quality_issues = []
-        if missing_ratio > 10:
-            quality_issues.append(f"결측값이 전체의 {missing_ratio:.1f}% 발견 (주의 필요)")
-        if duplicate_ratio > 5:
-            quality_issues.append(f"중복값이 전체의 {duplicate_ratio:.1f}% 발견")
-        
-        return missing_ratio, duplicate_ratio, quality_issues
-    
-    def detect_outliers(df, numeric_cols):
-        """이상값 탐지"""
-        outlier_info = []
-        for col in numeric_cols:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)]
-            if len(outliers) > 0:
-                outlier_ratio = len(outliers) / len(df) * 100
-                outlier_info.append(f"{col}: {len(outliers)}개 ({outlier_ratio:.1f}%)")
-        return outlier_info
-    
-    def analyze_distributions(df, numeric_cols, categorical_cols):
-        """분포 특성 분석"""
-        distribution_insights = []
-        
-        # 수치형 컬럼 분포 분석
-        for col in numeric_cols:
-            skewness = scipy_stats.skew(df[col].dropna())
-            if abs(skewness) > 1:
-                direction = "왼쪽" if skewness < 0 else "오른쪽"
-                distribution_insights.append(f"{col}: {direction} 치우친 분포 (Skewness: {skewness:.2f})")
-        
-        # 범주형 컬럼 분포 분석
-        for col in categorical_cols:
-            value_counts = df[col].value_counts()
-            if len(value_counts) > 0:
-                max_freq = value_counts.iloc[0]
-                total_count = len(df[col].dropna())
-                if max_freq / total_count > 0.7:
-                    distribution_insights.append(f"{col}: 한 값이 {max_freq/total_count*100:.1f}% 차지 (불균등 분포)")
-        
-        return distribution_insights
-    
-    def generate_recommendations(quality_issues, outlier_info, distribution_insights):
-        """권장사항 생성"""
-        recommendations = []
-        
-        if quality_issues:
-            recommendations.append("결측값 처리 방법 검토 필요")
-            recommendations.append("평균/중앙값 대체 vs 행 삭제 고려")
-        
-        if outlier_info:
-            recommendations.append("이상값 원인 분석 권장")
-            recommendations.append("데이터 수집 과정 검토")
-        
-        if distribution_insights:
-            recommendations.append("데이터 변환 고려")
-            recommendations.append("로그 변환, 정규화 등 적용 검토")
-        
-        return recommendations
 
     # 타입 분류 함수
     def smart_type_infer(df):
@@ -292,107 +221,65 @@ if uploaded_file is not None:
         else:
             st.info("최소 2개의 수치형 컬럼을 선택해주세요")
     
+    
+        
+        
+        st.markdown("---")
+        st.header("📊 데이터 통계 요약")
+        
+        # 전체 데이터셋 정보
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("총 행 수", f"{data.shape[0]:,}")
+        with col2:
+            st.metric("총 열 수", f"{data.shape[1]:,}")
+        with col3:
+            missing_count = data.isnull().sum().sum()
+            st.metric("결측값 개수", f"{missing_count:,}")
+        with col4:
+            duplicate_count = data.duplicated().sum()
+            st.metric("중복 행 수", f"{duplicate_count:,}")
         
         st.markdown("---")
         
-        if st.sidebar.button("데이터 분석 시작", use_container_width=True):
-            time.sleep(2)
-            st.header("📋 데이터 분석 인사이트 및 결론")
 
-            # 상관관계 분석 (수치형 컬럼이 2개 이상일 때)
-            if len(numeric_cols) >= 2:
-                st.subheader("🔗 상관관계 분석")
-                correlation_matrix = data[numeric_cols].corr()
-                fig_corr = px.imshow(correlation_matrix, 
-                                    text_auto=True, 
-                                    aspect="auto",
-                                    title="수치형 컬럼 간 상관관계",
-                                    color_continuous_scale='RdBu_r')
-                fig_corr.update_layout(height=500)
-                st.plotly_chart(fig_corr, use_container_width=True)
-            else:
-                st.info("상관관계 분석을 위해서는 최소 2개의 수치형 컬럼이 필요합니다.")
+        # 상관관계 분석 (수치형 컬럼이 2개 이상일 때)
+        if len(numeric_cols) >= 2:
+            st.subheader("🔗 상관관계 분석")
+            correlation_matrix = data[numeric_cols].corr()
+            fig_corr = px.imshow(correlation_matrix, 
+                                text_auto=True, 
+                                aspect="auto",
+                                title="수치형 컬럼 간 상관관계",
+                                color_continuous_scale='RdBu_r')
+            fig_corr.update_layout(height=500)
+            st.plotly_chart(fig_corr, use_container_width=True)
+        else:
+            st.info("상관관계 분석을 위해서는 최소 2개의 수치형 컬럼이 필요합니다.")
 
-            # 수치형 컬럼 통계 요약
-            if len(numeric_cols) > 0:
-                st.subheader("🔢 수치형 컬럼 통계")
-                numeric_stats = data[numeric_cols].describe()
-                st.dataframe(numeric_stats, use_container_width=True)
-                st.markdown("---")
-            
-            # 범주형 컬럼 통계 요약
-            if len(categorical_cols) > 0:
-                st.subheader("📝 범주형 컬럼 통계")
-                categorical_stats = []
-                for col in categorical_cols:
-                    stats = {
-                        '컬럼명': col,
-                        '고유값 개수': data[col].nunique(),
-                        '최빈값': data[col].mode().iloc[0] if not data[col].mode().empty else 'N/A',
-                        '최빈값 빈도': data[col].value_counts().iloc[0] if len(data[col].value_counts()) > 0 else 0,
-                        '결측값 개수': data[col].isnull().sum()
-                    }
-                    categorical_stats.append(stats)
-                st.dataframe(pd.DataFrame(categorical_stats), use_container_width=True)
-                st.markdown("---")
-                    
-            # 분석 실행
-            missing_ratio, duplicate_ratio, quality_issues = analyze_data_quality(data)
-            outlier_info = detect_outliers(data, numeric_cols)
-            distribution_insights = analyze_distributions(data, numeric_cols, categorical_cols)
-            recommendations = generate_recommendations(quality_issues, outlier_info, distribution_insights)
-            
-            # 상세 분석 결과
-            st.subheader("📊 상세 분석 결과")
-
+        # 수치형 컬럼 통계 요약
+        if len(numeric_cols) > 0:
+            st.subheader("🔢 수치형 컬럼 통계")
+            numeric_stats = data[numeric_cols].describe()
+            st.dataframe(numeric_stats, use_container_width=True)
             st.markdown("---")
-            
-            # 데이터 품질 분석 (확장 가능)
-
-            with st.expander("🔍 데이터 품질 분석", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("결측값 비율", f"{missing_ratio:.1f}%", 
-                            help="전체 데이터에서 결측값이 차지하는 비율입니다")
-                with col2:
-                    st.metric("중복값 비율", f"{duplicate_ratio:.1f}%",
-                            help="전체 행에서 중복된 행이 차지하는 비율입니다")
-                
-                if quality_issues:
-                    st.error("⚠️ 품질 이슈 발견:")
-                    for issue in quality_issues:
-                        st.write(f"• {issue}")
-                else:
-                    st.success("✅ 데이터 품질이 양호합니다")
-            
-            # 이상값 분석
-            with st.expander("🔍 이상값 분석", expanded=True):
-                if outlier_info:
-                    st.info(f"총 {len(outlier_info)}개 컬럼에서 이상값이 발견되었습니다")
-                    for outlier in outlier_info:
-                        st.write(f"• {outlier}")
-                else:
-                    st.success("✅ 이상값이 발견되지 않았습니다")
-            
-            
+        
+        # 범주형 컬럼 통계 요약
+        if len(categorical_cols) > 0:
+            st.subheader("📝 범주형 컬럼 통계")
+            categorical_stats = []
+            for col in categorical_cols:
+                stats = {
+                    '컬럼명': col,
+                    '고유값 개수': data[col].nunique(),
+                    '최빈값': data[col].mode().iloc[0] if not data[col].mode().empty else 'N/A',
+                    '최빈값 빈도': data[col].value_counts().iloc[0] if len(data[col].value_counts()) > 0 else 0,
+                    '결측값 개수': data[col].isnull().sum()
+                }
+                categorical_stats.append(stats)
+            st.dataframe(pd.DataFrame(categorical_stats), use_container_width=True)
             st.markdown("---")
-            
-            # 권장사항 (확장 가능)
-            with st.expander("💡 단계별 권장사항", expanded=True):
-                if recommendations:
-                    st.info("분석 결과를 바탕으로 다음 단계를 권장합니다:")
-                    for i, rec in enumerate(recommendations, 1):
-                        st.write(f"**{i}단계**: {rec}")
-                        
-                        # 상세 설명 추가
-                        if "결측값 처리" in rec:
-                            st.caption("💡 팁: 결측값이 많은 경우 해당 행을 삭제하거나, 적은 경우 평균/중앙값으로 대체를 고려하세요")
-                        elif "이상값" in rec:
-                            st.caption("💡 팁: 이상값이 비즈니스적으로 의미있는지 확인하고, 단순히 제거하지 마세요")
-                        elif "데이터 변환" in rec:
-                            st.caption("💡 팁: 로그 변환, 제곱근 변환 등을 통해 정규분포에 가깝게 만들 수 있습니다")
-                else:
-                    st.success("✅ 추가적인 데이터 전처리가 필요하지 않습니다")
+        
 
 else:
     st.title("📊 데이터 분포 분석 및 시각화")
